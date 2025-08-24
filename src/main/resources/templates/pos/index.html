@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Gold Resto POS</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .product-grid {
+            height: calc(100vh - 100px);
+            overflow-y: auto;
+        }
+        .cart-section {
+            height: calc(100vh - 100px);
+            background-color: #f8f9fa;
+            border-left: 1px solid #dee2e6;
+        }
+        .product-card {
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .product-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .product-image {
+            height: 120px;
+            object-fit: cover;
+        }
+        .cart-items {
+            height: calc(100vh - 350px);
+            overflow-y: auto;
+        }
+        .quantity-control {
+            width: 120px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Active Orders -->
+            <div class="col-md-12 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4>Commandes en cours</h4>
+                    <span class="badge bg-primary" th:text="${#lists.size(paniersEnCours)} + ' commande(s)'"></span>
+                </div>
+                <div class="row g-4">
+                    <div th:each="panier : ${paniersEnCours}" class="col-md-3">
+                        <div class="card h-100 border-primary">
+                            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">Table #<span th:text="${panier.numeroTable}"></span></h5>
+                                <span class="badge bg-light text-primary" th:text="${#lists.size(panier.lignesProduits)} + ' article(s)'"></span>
+                            </div>
+                            <div class="card-body">
+                                <div class="small text-muted mb-2" th:text="${#temporals.format(panier.date, 'HH:mm')}"></div>
+                                <div class="mb-3">
+                                    <div th:each="ligne : ${panier.lignesProduits}" class="small mb-1">
+                                        <span th:text="${ligne.quantite} + 'x '"></span>
+                                        <span th:text="${ligne.produit.nomProduit}"></span>
+                                    </div>
+                                </div>
+                                <hr>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0">Total:</h5>
+                                    <h5 class="mb-0 text-primary" th:text="${panier.total != null ? #numbers.formatDecimal(panier.total,1,2) : '0.00'} + ' €'"></h5>
+                                </div>
+                            </div>
+                            <div class="card-footer bg-transparent border-0 p-3">
+                                <button class="btn btn-primary w-100" th:onclick="|loadPanierForCheckout(${panier.id})|">
+                                    <i class="bi bi-credit-card me-2"></i>Procéder au paiement
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Products Grid -->
+            <div class="col-md-8 product-grid p-4">
+                <div class="row g-4">
+                    <div th:each="produit : ${produits}" class="col-6 col-md-4 col-lg-3">
+                        <div class="card product-card" 
+                            th:data-produit-id=${produit.id} 
+                            th:data-nom=${#strings.escapeJavaScript(produit.nomProduit)}
+                            th:data-prix=${#numbers.formatDecimal(produit.prix,1,2)}
+                            th:data-stock=${produit.stock}
+                            th:onclick="|addToCart(${produit.id})|">
+                            <img th:if="${produit.imagePath}" 
+                                 th:src="@{'/'+${produit.imagePath}}" 
+                                 class="card-img-top product-image"
+                                 th:alt="${produit.nomProduit}">
+                            <div class="card-body">
+                                <h6 class="card-title" th:text="${produit.nomProduit}">Nom du produit</h6>
+                                <p class="card-text">
+                                    <span class="badge bg-info" th:text="${produit.categorie}">Catégorie</span>
+                                    <span class="badge bg-success" th:text="${produit.stock + ' en stock'}">Stock</span>
+                                </p>
+                                <p class="card-text">
+                                    <strong th:text="${#numbers.formatDecimal(produit.prix, 1, 2) + ' €'}">0.00 €</strong>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cart Section -->
+            <div class="col-md-4 cart-section p-4">
+                <h4>Panier en cours</h4>
+                
+                <!-- Table Number -->
+                <div class="mb-4">
+                    <label for="tableNumber" class="form-label">Numéro de table</label>
+                    <input type="number" class="form-control" id="tableNumber" min="1" max="100" value="1" onchange="validateTableNumber(this.value)">
+                    <div id="tableNumberFeedback" class="invalid-feedback"></div>
+                </div>
+
+                <!-- Cart Items -->
+                <div class="cart-items mb-4">
+                    <div id="cartItemsList">
+                        <!-- Cart items will be dynamically added here -->
+                    </div>
+                </div>
+
+                <!-- Cart Summary -->
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Total</h5>
+                        <h3 class="card-text mb-4" id="cartTotal">0.00 €</h3>
+                        <button class="btn btn-primary w-100 mb-2" onclick="validatePanier()">Valider la commande</button>
+                        <button class="btn btn-success w-100" onclick="showCheckout()" id="checkoutBtn" style="display: none;">
+                            Procéder au paiement
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Checkout Modal -->
+    <div class="modal fade" id="checkoutModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Paiement</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Montant à payer</label>
+                        <input type="text" class="form-control" id="montantAPayer" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Espèces reçues</label>
+                        <input type="number" class="form-control" id="cashRecu" step="0.01">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Monnaie à rendre</label>
+                        <input type="text" class="form-control" id="monnaie" readonly>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="button" class="btn btn-primary" onclick="processPaiement()">Confirmer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/decimal.js/10.4.3/decimal.min.js"></script>
+    <script>
+        let currentPanier = null;
+        let cartItems = new Map();
+
+        function addToCart(produitId) {
+            const existingItem = cartItems.get(produitId);
+            if (existingItem) {
+                existingItem.quantity++;
+                updateCartDisplay();
+            } else {
+                const produitCard = document.querySelector(`[data-produit-id='${produitId}']`);
+                const produit = {
+                    id: produitId,
+                    nomProduit: produitCard.dataset.nom,
+                    prix: parseFloat(produitCard.dataset.prix),
+                    stock: parseInt(produitCard.dataset.stock)
+                };
+                cartItems.set(produitId, {
+                    produit: produit,
+                    quantity: 1
+                });
+                updateCartDisplay();
+            }
+        }
+
+        function updateQuantity(produitId, delta) {
+            const item = cartItems.get(produitId);
+            if (item) {
+                item.quantity = Math.max(1, item.quantity + delta);
+                updateCartDisplay();
+            }
+        }
+
+        function removeItem(produitId) {
+            cartItems.delete(produitId);
+            updateCartDisplay();
+        }
+
+        function updateCartDisplay() {
+            const cartList = document.getElementById('cartItemsList');
+            cartList.innerHTML = '';
+            let total = 0;
+
+            cartItems.forEach((item, produitId) => {
+                if (item.produit && item.produit.prix) {
+                    const sousTotal = new Decimal(item.produit.prix).times(item.quantity);
+                    total = new Decimal(total).plus(sousTotal);
+
+                    cartList.innerHTML += `
+                        <div class="card mb-2">
+                            <div class="card-body">
+                                <h6 class="card-title">${item.produit.nomProduit}</h6>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="quantity-control input-group">
+                                        <button class="btn btn-outline-secondary" onclick="updateQuantity(${produitId}, -1)">-</button>
+                                        <input type="number" class="form-control text-center" value="${item.quantity}" readonly>
+                                        <button class="btn btn-outline-secondary" onclick="updateQuantity(${produitId}, 1)">+</button>
+                                    </div>
+                                    <span>${sousTotal.toFixed(2)} €</span>
+                                    <button class="btn btn-danger btn-sm" onclick="removeItem(${produitId})">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+
+            document.getElementById('cartTotal').textContent = total.toFixed(2) + ' €';
+        }
+
+        async function validateTableNumber(tableNumber) {
+            try {
+                const response = await fetch(`/pos/panier/check-table/${tableNumber}`);
+                const isTableInUse = await response.json();
+                const tableInput = document.getElementById('tableNumber');
+                const feedback = document.getElementById('tableNumberFeedback');
+                
+                if (isTableInUse) {
+                    tableInput.classList.add('is-invalid');
+                    feedback.textContent = 'Cette table est déjà occupée';
+                    return false;
+                } else {
+                    tableInput.classList.remove('is-invalid');
+                    feedback.textContent = '';
+                    return true;
+                }
+            } catch (error) {
+                console.error('Error validating table:', error);
+                return false;
+            }
+        }
+
+        async function validatePanier() {
+            const tableNumber = document.getElementById('tableNumber').value;
+            if (!tableNumber || cartItems.size === 0) {
+                alert('Veuillez sélectionner une table et des produits');
+                return;
+            }
+
+            const isTableValid = await validateTableNumber(tableNumber);
+            if (!isTableValid) {
+                alert('Cette table est déjà occupée');
+                return;
+            }
+
+            const panier = {
+                numeroTable: parseInt(tableNumber),
+                state: 'EN_COURS'
+            };
+
+            console.log('Validating panier:', panier);
+            console.log('cartItems at validation:', Array.from(cartItems.entries()));
+
+            fetch('/pos/panier/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(panier)
+            })
+            .then(response => response.json())
+            .then(newPanier => {
+                currentPanier = newPanier;
+                const promises = [];
+
+                cartItems.forEach((item, produitId) => {
+                    console.log(`Sending addProduct for panier ${newPanier.id}, produit ${produitId}, quantite ${item.quantity}`);
+                    promises.push(
+                        fetch(`/pos/panier/${newPanier.id}/addProduct?produitId=${produitId}&quantite=${item.quantity}`, {
+                            method: 'POST'
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`Failed to add product ${produitId}`);
+                            }
+                            return response.json();
+                        })
+                    );
+                });
+
+                return Promise.all(promises)
+                    .then(results => {
+                        // Use the last result as it has the final panier state
+                        if (results.length > 0) {
+                            currentPanier = results[results.length - 1];
+                            document.getElementById('cartTotal').textContent = 
+                                currentPanier.total.toFixed(2) + ' €';
+                            document.getElementById('checkoutBtn').style.display = 'block';
+                        }
+                    });
+            })
+            .then(() => {
+                clearInterface();
+                alert('Commande validée !');
+            });
+        }
+
+        function showCheckout() {
+            if (!currentPanier) return;
+
+            fetch(`/pos/panier/${currentPanier.id}`)
+                .then(response => response.json())
+                .then(panier => {
+                    document.getElementById('montantAPayer').value = panier.total.toFixed(2) + ' €';
+                    document.getElementById('cashRecu').value = '';
+                    document.getElementById('monnaie').value = '';
+                    new bootstrap.Modal(document.getElementById('checkoutModal')).show();
+                });
+        }
+
+        function calculateMonnaie() {
+            const montantAPayer = parseFloat(document.getElementById('montantAPayer').value);
+            const cashRecu = parseFloat(document.getElementById('cashRecu').value);
+            const monnaie = cashRecu - montantAPayer;
+            document.getElementById('monnaie').value = monnaie.toFixed(2) + ' €';
+        }
+
+        document.getElementById('cashRecu').addEventListener('input', calculateMonnaie);
+
+        function loadPanierForCheckout(panierId) {
+            fetch(`/pos/panier/${panierId}`)
+                .then(response => response.json())
+                .then(panier => {
+                    currentPanier = panier;
+                    document.getElementById('montantAPayer').value = panier.total.toFixed(2) + ' €';
+                    document.getElementById('cashRecu').value = '';
+                    document.getElementById('monnaie').value = '';
+                    new bootstrap.Modal(document.getElementById('checkoutModal')).show();
+                });
+        }
+
+        function clearInterface() {
+            cartItems.clear();
+            currentPanier = null;
+            document.getElementById('tableNumber').value = '1';
+            document.getElementById('checkoutBtn').style.display = 'none';
+            updateCartDisplay();
+        }
+
+        function processPaiement() {
+            if (!currentPanier) return;
+
+            const paiement = {
+                cashRecu: parseFloat(document.getElementById('cashRecu').value),
+                montantAPayer: parseFloat(document.getElementById('montantAPayer').value)
+            };
+
+            fetch(`/pos/paiement/${currentPanier.id}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(paiement)
+            })
+            .then(response => response.json())
+            .then(() => {
+                alert('Paiement effectué avec succès !');
+                clearInterface();
+                new bootstrap.Modal(document.getElementById('checkoutModal')).hide();
+            });
+        }
+    </script>
+</body>
+</html>
