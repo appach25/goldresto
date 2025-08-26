@@ -12,7 +12,7 @@ import java.util.Optional;
 public interface PanierRepository extends JpaRepository<Panier, Long> {
     List<Panier> findByState(PanierState state);
     
-    @Query("SELECT DISTINCT p FROM Panier p LEFT JOIN FETCH p.lignesProduits l LEFT JOIN FETCH l.produit WHERE p.state = :state")
+    @Query("SELECT DISTINCT p FROM Panier p LEFT JOIN FETCH p.lignesProduits l LEFT JOIN FETCH l.produit WHERE p.state = :state ORDER BY p.date DESC")
     List<Panier> findPaniersWithLignesAndProduits(PanierState state);
     List<Panier> findByNumeroTable(Integer numeroTable);
 

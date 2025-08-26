@@ -4,17 +4,23 @@ import java.util.List;
 
 import com.goldresto.entity.*;
 import com.goldresto.repository.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/pos")
 public class POSController {
+    private static final Logger logger = LoggerFactory.getLogger(POSController.class);
 
     @Autowired
     private PanierRepository panierRepository;
@@ -28,6 +34,9 @@ public class POSController {
     @Autowired
     private PaiementRepository paiementRepository;
 
+    @Autowired
+    private JournalRepository journalRepository;
+
     @GetMapping
     public String posInterface(Model model) {
         model.addAttribute("produits", produitRepository.findAll());
@@ -36,6 +45,46 @@ public class POSController {
         return "pos/index";
     }
 
+    @GetMapping("/")
+    public String index(Model model) {
+        List<Produit> produits = produitRepository.findAll();
+        model.addAttribute("produits", produits);
+        return "pos/index";
+    }
+
+    @GetMapping("/paniers")
+    @Transactional(readOnly = true)
+    public String paniers(Model model) {
+        try {
+            logger.debug("Fetching active paniers");
+            logger.debug("Fetching active paniers with products");
+            List<Panier> paniers = panierRepository.findPaniersWithLignesAndProduits(PanierState.EN_COURS);
+            logger.debug("Found {} active paniers", paniers.size());
+            
+            // Log details for debugging
+            for (Panier panier : paniers) {
+                logger.debug("Panier {} has {} products", panier.getId(), panier.getLignesProduits().size());
+                for (LignedeProduit ligne : panier.getLignesProduits()) {
+                    logger.debug("  - Product: {}, Quantity: {}", 
+                        ligne.getProduit().getNomProduit(), ligne.getQuantite());
+                }
+            }
+            logger.debug("Found {} active paniers", paniers.size());
+            
+            // Initialize the collections
+            for (Panier panier : paniers) {
+                logger.debug("Initializing panier {} with {} products", 
+                    panier.getId(), panier.getLignesProduits().size());
+            }
+            
+            model.addAttribute("paniers", paniers);
+            return "pos/paniers";
+        } catch (Exception e) {
+            logger.error("Error fetching paniers: ", e);
+            model.addAttribute("error", "Une erreur est survenue lors du chargement des paniers.");
+            return "pos/paniers";
+        }
+    }
 
     @PostMapping("/panier/create")
     @ResponseBody
@@ -48,34 +97,51 @@ public class POSController {
 
     @PostMapping("/panier/{panierId}/addProduct")
     @ResponseBody
+    @Transactional
     public ResponseEntity<?> addProduct(@PathVariable Long panierId, 
                                       @RequestParam Long produitId,
                                       @RequestParam Integer quantite) {
-    Panier panier = panierRepository.findByIdWithLignes(panierId)
-        .orElseThrow(() -> new IllegalArgumentException("Invalid panier ID"));
+        Panier panier = panierRepository.findByIdWithLignes(panierId)
+            .orElseThrow(() -> new IllegalArgumentException("Invalid panier ID"));
 
-    Produit produit = produitRepository.findById(produitId)
-        .orElseThrow(() -> new IllegalArgumentException("Invalid produit ID"));
+        Produit produit = produitRepository.findById(produitId)
+            .orElseThrow(() -> new IllegalArgumentException("Invalid produit ID"));
 
-    LignedeProduit ligne = new LignedeProduit();
-    ligne.setProduit(produit);
-    ligne.setQuantite(quantite);
-    ligne.setPrixUnitaire(produit.getPrix());
-    ligne.setPanier(panier);
-    ligne = lignedeProduitRepository.save(ligne);
-    // Fetch all LignedeProduit for this panier from the DB
-    List<LignedeProduit> allLignes = new java.util.ArrayList<>(
-        lignedeProduitRepository.findAll()
-            .stream()
-            .filter(l -> l.getPanier() != null && l.getPanier().getId().equals(panierId))
-            .toList()
-    );
-    panier.getLignesProduits().clear();
-    panier.getLignesProduits().addAll(allLignes);
-    panier.updateAllSousTotals();
-    panier.calculateTotal();
-    panier = panierRepository.save(panier);
-    return ResponseEntity.ok(panier);
+        // Look for existing LignedeProduit with the same product
+        Optional<LignedeProduit> existingLigne = panier.getLignesProduits().stream()
+            .filter(l -> l.getProduit().getId().equals(produitId))
+            .findFirst();
+
+        if (existingLigne.isPresent()) {
+            // Update existing line
+            LignedeProduit ligne = existingLigne.get();
+            ligne.setQuantite(ligne.getQuantite() + quantite);
+            ligne.setPrixUnitaire(produit.getPrix());
+            ligne.calculateSousTotal();
+            lignedeProduitRepository.save(ligne);
+        } else {
+            // Create new line
+            LignedeProduit ligne = new LignedeProduit();
+            ligne.setProduit(produit);
+            ligne.setQuantite(quantite);
+            ligne.setPrixUnitaire(produit.getPrix());
+            ligne.setPanier(panier);
+            ligne.calculateSousTotal();
+            lignedeProduitRepository.save(ligne);
+            panier.getLignesProduits().add(ligne);
+        }
+
+        panier.calculateTotal();
+        panier = panierRepository.save(panier);
+        return ResponseEntity.ok(panier);
+    }
+
+    // Place this method BEFORE getPanier(Long id)
+    @GetMapping("/panier/checkNumeroTable")
+    @ResponseBody
+    public ResponseEntity<?> checkNumeroTable(@RequestParam Integer numeroTable) {
+        boolean exists = panierRepository.existsByNumeroTableAndState(numeroTable, PanierState.EN_COURS);
+        return ResponseEntity.ok(exists);
     }
 
     @GetMapping("/panier/{id}")
@@ -91,13 +157,48 @@ public class POSController {
                 .orElseThrow(() -> new IllegalArgumentException("Invalid panier ID"));
         
         paiement.setPanier(panier);
-        return ResponseEntity.ok(paiementRepository.save(paiement));
+        Paiement savedPaiement = paiementRepository.save(paiement);
+
+        // Persist Journal after payment
+        Journal journal = new Journal();
+        journal.setPanierId(panier.getId()); // Set the original Panier ID
+        journal.setNumeroTable(panier.getNumeroTable());
+        journal.setTotal(panier.getTotal() != null ? panier.getTotal().doubleValue() : null);
+        journal.setDatePaiement(java.time.LocalDateTime.now());
+        journal.setMontantRecu(paiement.getCashRecu() != null ? paiement.getCashRecu().doubleValue() : null);
+        journal.setMonnaieRendue(
+            (paiement.getCashRecu() != null && panier.getTotal() != null)
+                ? paiement.getCashRecu().subtract(panier.getTotal()).doubleValue()
+                : null
+        );
+        if (panier.getLignesProduits() != null) {
+            journal.setLignesProduits(
+                panier.getLignesProduits().stream().map(ligne -> {
+                    JournalLigne jl = new JournalLigne();
+                    jl.setNomProduit(ligne.getProduit().getNomProduit());
+                    jl.setQuantite(ligne.getQuantite());
+                    jl.setPrixUnitaire(ligne.getPrixUnitaire() != null ? ligne.getPrixUnitaire().doubleValue() : null);
+                    jl.setSousTotal(ligne.getSousTotal() != null ? ligne.getSousTotal().doubleValue() : null);
+                    return jl;
+                }).collect(java.util.stream.Collectors.toList())
+            );
+        }
+        journalRepository.save(journal);
+
+        return ResponseEntity.ok(savedPaiement);
     }
 
-    @GetMapping("/panier/check-table/{numeroTable}")
+    // Endpoint to clear all products from a panier (for editing)
+    @PostMapping("/panier/{panierId}/clearProducts")
     @ResponseBody
-    public ResponseEntity<?> checkNumeroTable(@PathVariable Integer numeroTable) {
-        boolean exists = panierRepository.existsByNumeroTableAndState(numeroTable, PanierState.EN_COURS);
-        return ResponseEntity.ok(exists);
+    public ResponseEntity<?> clearProducts(@PathVariable Long panierId) {
+        Panier panier = panierRepository.findByIdWithLignes(panierId)
+            .orElseThrow(() -> new IllegalArgumentException("Invalid panier ID"));
+        panier.getLignesProduits().clear();
+        panier.calculateTotal();
+        panierRepository.save(panier);
+        // Optionally, also delete lines from LignedeProduitRepository if needed
+        return ResponseEntity.ok().build();
     }
 }
+

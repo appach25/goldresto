@@ -39,42 +39,7 @@
 <body>
     <div class="container-fluid">
         <div class="row">
-            <!-- Active Orders -->
-            <div class="col-md-12 mb-4">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h4>Commandes en cours</h4>
-                    <span class="badge bg-primary" th:text="${#lists.size(paniersEnCours)} + ' commande(s)'"></span>
-                </div>
-                <div class="row g-4">
-                    <div th:each="panier : ${paniersEnCours}" class="col-md-3">
-                        <div class="card h-100 border-primary">
-                            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                                <h5 class="mb-0">Table #<span th:text="${panier.numeroTable}"></span></h5>
-                                <span class="badge bg-light text-primary" th:text="${#lists.size(panier.lignesProduits)} + ' article(s)'"></span>
-                            </div>
-                            <div class="card-body">
-                                <div class="small text-muted mb-2" th:text="${#temporals.format(panier.date, 'HH:mm')}"></div>
-                                <div class="mb-3">
-                                    <div th:each="ligne : ${panier.lignesProduits}" class="small mb-1">
-                                        <span th:text="${ligne.quantite} + 'x '"></span>
-                                        <span th:text="${ligne.produit.nomProduit}"></span>
-                                    </div>
-                                </div>
-                                <hr>
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <h5 class="mb-0">Total:</h5>
-                                    <h5 class="mb-0 text-primary" th:text="${panier.total != null ? #numbers.formatDecimal(panier.total,1,2) : '0.00'} + ' €'"></h5>
-                                </div>
-                            </div>
-                            <div class="card-footer bg-transparent border-0 p-3">
-                                <button class="btn btn-primary w-100" th:onclick="|loadPanierForCheckout(${panier.id})|">
-                                    <i class="bi bi-credit-card me-2"></i>Procéder au paiement
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            
 
             <!-- Products Grid -->
             <div class="col-md-8 product-grid p-4">
@@ -97,7 +62,7 @@
                                     <span class="badge bg-success" th:text="${produit.stock + ' en stock'}">Stock</span>
                                 </p>
                                 <p class="card-text">
-                                    <strong th:text="${#numbers.formatDecimal(produit.prix, 1, 2) + ' €'}">0.00 €</strong>
+                                    <strong class="text-end" th:text="'$' + ${#numbers.formatDecimal(produit.prix, 1, 2)}">$0.00</strong>
                                 </p>
                             </div>
                         </div>
@@ -127,46 +92,36 @@
                 <div class="card">
                     <div class="card-body">
                         <h5 class="card-title">Total</h5>
-                        <h3 class="card-text mb-4" id="cartTotal">0.00 €</h3>
-                        <button class="btn btn-primary w-100 mb-2" onclick="validatePanier()">Valider la commande</button>
-                        <button class="btn btn-success w-100" onclick="showCheckout()" id="checkoutBtn" style="display: none;">
-                            Procéder au paiement
-                        </button>
+                        <h3 class="card-text mb-4" id="cartTotal">$0.00</h3>
+                        <button class="btn btn-primary w-100" onclick="validatePanier()">Valider la commande</button>
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
 
-    <!-- Checkout Modal -->
-    <div class="modal fade" id="checkoutModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Paiement</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label">Montant à payer</label>
-                        <input type="text" class="form-control" id="montantAPayer" readonly>
+                <!-- Paniers en cours list -->
+                <div class="mt-4 border-top pt-4">
+                    <h5 class="mb-3">Paniers en cours</h5>
+                    <div class="list-group">
+                        <div th:each="panier : ${paniersEnCours}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <h6 class="mb-1">Table [[${panier.numeroTable}]]</h6>
+                                <small class="text-muted">Total: $[[${#numbers.formatDecimal(panier.total,1,2)}]]</small>
+                            </div>
+                            <div class="btn-group">
+                                <button class="btn btn-outline-primary"
+                                        th:onclick="|editPanier(${panier.id})|"
+                                        title="Modifier le panier existant">
+                                    <i class="bi bi-pencil"></i> Modifier
+                                </button>
+                                <button class="btn btn-success"
+                                        th:onclick="|editPanier(${panier.id}, true)|"
+                                        title="Ajouter de nouveaux produits">
+                                    <i class="bi bi-plus-circle"></i> Ajouter
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Espèces reçues</label>
-                        <input type="number" class="form-control" id="cashRecu" step="0.01">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Monnaie à rendre</label>
-                        <input type="text" class="form-control" id="monnaie" readonly>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                    <button type="button" class="btn btn-primary" onclick="processPaiement()">Confirmer</button>
                 </div>
             </div>
-        </div>
-    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/decimal.js/10.4.3/decimal.min.js"></script>
@@ -177,8 +132,11 @@
         function addToCart(produitId) {
             const existingItem = cartItems.get(produitId);
             if (existingItem) {
-                existingItem.quantity++;
-                updateCartDisplay();
+                // Only allow increment if not readonly
+                if (!existingItem.readonly) {
+                    existingItem.quantity++;
+                    updateCartDisplay();
+                }
             } else {
                 const produitCard = document.querySelector(`[data-produit-id='${produitId}']`);
                 const produit = {
@@ -189,7 +147,8 @@
                 };
                 cartItems.set(produitId, {
                     produit: produit,
-                    quantity: 1
+                    quantity: 1,
+                    readonly: false // new items are editable
                 });
                 updateCartDisplay();
             }
@@ -198,14 +157,26 @@
         function updateQuantity(produitId, delta) {
             const item = cartItems.get(produitId);
             if (item) {
-                item.quantity = Math.max(1, item.quantity + delta);
-                updateCartDisplay();
+                // For readonly items, only allow increment (delta > 0)
+                if (item.readonly) {
+                    if (delta > 0) {
+                        item.quantity = item.quantity + delta;
+                        updateCartDisplay();
+                    }
+                    // Ignore decrement for readonly items
+                } else {
+                    item.quantity = Math.max(1, item.quantity + delta);
+                    updateCartDisplay();
+                }
             }
         }
 
         function removeItem(produitId) {
-            cartItems.delete(produitId);
-            updateCartDisplay();
+            const item = cartItems.get(produitId);
+            if (item && !item.readonly) {
+                cartItems.delete(produitId);
+                updateCartDisplay();
+            }
         }
 
         function updateCartDisplay() {
@@ -224,12 +195,14 @@
                                 <h6 class="card-title">${item.produit.nomProduit}</h6>
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div class="quantity-control input-group">
-                                        <button class="btn btn-outline-secondary" onclick="updateQuantity(${produitId}, -1)">-</button>
+                                        <button class="btn btn-outline-secondary" onclick="updateQuantity(${produitId}, -1)" ${item.readonly ? 'disabled' : ''}>-</button>
                                         <input type="number" class="form-control text-center" value="${item.quantity}" readonly>
-                                        <button class="btn btn-outline-secondary" onclick="updateQuantity(${produitId}, 1)">+</button>
+                                        <button class="btn btn-outline-secondary" onclick="updateQuantity(${produitId}, 1)">
+                                            <i class="bi bi-plus"></i>
+                                        </button>
                                     </div>
-                                    <span>${sousTotal.toFixed(2)} €</span>
-                                    <button class="btn btn-danger btn-sm" onclick="removeItem(${produitId})">
+                                    <span>$${sousTotal.toFixed(2)}</span>
+                                    <button class="btn btn-danger btn-sm" onclick="removeItem(${produitId})" ${item.readonly ? 'disabled' : ''}>
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </div>
@@ -239,12 +212,13 @@
                 }
             });
 
-            document.getElementById('cartTotal').textContent = total.toFixed(2) + ' €';
+            document.getElementById('cartTotal').textContent = '$' + total.toFixed(2);
         }
 
         async function validateTableNumber(tableNumber) {
             try {
-                const response = await fetch(`/pos/panier/check-table/${tableNumber}`);
+                // FIX: Use the correct endpoint as defined in your Spring controller
+                const response = await fetch(`/pos/panier/checkNumeroTable?numeroTable=${tableNumber}`);
                 const isTableInUse = await response.json();
                 const tableInput = document.getElementById('tableNumber');
                 const feedback = document.getElementById('tableNumberFeedback');
@@ -264,6 +238,58 @@
             }
         }
 
+        // Utility to get query param
+        function getQueryParam(name) {
+            const url = new URL(window.location.href);
+            return url.searchParams.get(name);
+        }
+
+        // On page load, check if editing or adding product to a panier
+        window.addEventListener('DOMContentLoaded', async () => {
+            const editPanierId = getQueryParam('editPanierId');
+            const addProduitPanierId = getQueryParam('addProduitPanierId');
+            if (editPanierId) {
+                await editPanier(editPanierId);
+            } else if (addProduitPanierId) {
+                await editPanier(addProduitPanierId, true); // pass flag to clear quantities
+            }
+        });
+
+        // Modified editPanier to accept a flag for clearing quantities
+        async function editPanier(panierId, clearQuantities = false) {
+            try {
+                const response = await fetch(`/pos/panier/${panierId}`);
+                const panierData = await response.json();
+                const panier = panierData.value ? panierData.value : panierData;
+
+                document.getElementById('tableNumber').value = panier.numeroTable;
+                cartItems.clear();
+
+                // If clearQuantities is true, do not add previous products to cartItems
+                if (!clearQuantities && panier.lignesProduits) {
+                    panier.lignesProduits.forEach(ligne => {
+                        cartItems.set(ligne.produit.id, {
+                            produit: {
+                                id: ligne.produit.id,
+                                nomProduit: ligne.produit.nomProduit,
+                                prix: ligne.produit.prix,
+                                stock: ligne.produit.stock
+                            },
+                            quantity: ligne.quantite,
+                            readonly: true // mark as readonly
+                        });
+                    });
+                }
+                // If clearQuantities is true, cartItems remains empty (quantities cleared)
+
+                currentPanier = panier;
+                updateCartDisplay();
+            } catch (error) {
+                alert('Erreur lors du chargement du panier');
+                console.error(error);
+            }
+        }
+
         async function validatePanier() {
             const tableNumber = document.getElementById('tableNumber').value;
             if (!tableNumber || cartItems.size === 0) {
@@ -271,19 +297,43 @@
                 return;
             }
 
-            const isTableValid = await validateTableNumber(tableNumber);
-            if (!isTableValid) {
-                alert('Cette table est déjà occupée');
+            // Only validate table number if creating a new panier (no currentPanier or currentPanier.id)
+            if (!currentPanier || !currentPanier.id) {
+                const isTableValid = await validateTableNumber(tableNumber);
+                if (!isTableValid) {
+                    alert('Cette table est déjà occupée');
+                    return;
+                }
+            }
+
+            // If editing or adding product to existing panier, skip table number validation
+            if (currentPanier && currentPanier.id) {
+                const promises = [];
+                cartItems.forEach((item, produitId) => {
+                    promises.push(
+                        fetch(`/pos/panier/${currentPanier.id}/addProduct?produitId=${produitId}&quantite=${item.quantity}`, {
+                            method: 'POST'
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`Failed to add product ${produitId}`);
+                            }
+                            return response.json();
+                        })
+                    );
+                });
+
+                await Promise.all(promises);
+                clearInterface();
+                alert('Panier modifié avec succès !');
                 return;
             }
 
+            // Otherwise, create a new panier
             const panier = {
                 numeroTable: parseInt(tableNumber),
                 state: 'EN_COURS'
             };
-
-            console.log('Validating panier:', panier);
-            console.log('cartItems at validation:', Array.from(cartItems.entries()));
 
             fetch('/pos/panier/create', {
                 method: 'POST',
@@ -298,7 +348,6 @@
                 const promises = [];
 
                 cartItems.forEach((item, produitId) => {
-                    console.log(`Sending addProduct for panier ${newPanier.id}, produit ${produitId}, quantite ${item.quantity}`);
                     promises.push(
                         fetch(`/pos/panier/${newPanier.id}/addProduct?produitId=${produitId}&quantite=${item.quantity}`, {
                             method: 'POST'
@@ -312,16 +361,7 @@
                     );
                 });
 
-                return Promise.all(promises)
-                    .then(results => {
-                        // Use the last result as it has the final panier state
-                        if (results.length > 0) {
-                            currentPanier = results[results.length - 1];
-                            document.getElementById('cartTotal').textContent = 
-                                currentPanier.total.toFixed(2) + ' €';
-                            document.getElementById('checkoutBtn').style.display = 'block';
-                        }
-                    });
+                return Promise.all(promises);
             })
             .then(() => {
                 clearInterface();
@@ -329,70 +369,14 @@
             });
         }
 
-        function showCheckout() {
-            if (!currentPanier) return;
-
-            fetch(`/pos/panier/${currentPanier.id}`)
-                .then(response => response.json())
-                .then(panier => {
-                    document.getElementById('montantAPayer').value = panier.total.toFixed(2) + ' €';
-                    document.getElementById('cashRecu').value = '';
-                    document.getElementById('monnaie').value = '';
-                    new bootstrap.Modal(document.getElementById('checkoutModal')).show();
-                });
-        }
-
-        function calculateMonnaie() {
-            const montantAPayer = parseFloat(document.getElementById('montantAPayer').value);
-            const cashRecu = parseFloat(document.getElementById('cashRecu').value);
-            const monnaie = cashRecu - montantAPayer;
-            document.getElementById('monnaie').value = monnaie.toFixed(2) + ' €';
-        }
-
-        document.getElementById('cashRecu').addEventListener('input', calculateMonnaie);
-
-        function loadPanierForCheckout(panierId) {
-            fetch(`/pos/panier/${panierId}`)
-                .then(response => response.json())
-                .then(panier => {
-                    currentPanier = panier;
-                    document.getElementById('montantAPayer').value = panier.total.toFixed(2) + ' €';
-                    document.getElementById('cashRecu').value = '';
-                    document.getElementById('monnaie').value = '';
-                    new bootstrap.Modal(document.getElementById('checkoutModal')).show();
-                });
-        }
-
         function clearInterface() {
             cartItems.clear();
             currentPanier = null;
             document.getElementById('tableNumber').value = '1';
-            document.getElementById('checkoutBtn').style.display = 'none';
             updateCartDisplay();
         }
 
-        function processPaiement() {
-            if (!currentPanier) return;
-
-            const paiement = {
-                cashRecu: parseFloat(document.getElementById('cashRecu').value),
-                montantAPayer: parseFloat(document.getElementById('montantAPayer').value)
-            };
-
-            fetch(`/pos/paiement/${currentPanier.id}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(paiement)
-            })
-            .then(response => response.json())
-            .then(() => {
-                alert('Paiement effectué avec succès !');
-                clearInterface();
-                new bootstrap.Modal(document.getElementById('checkoutModal')).hide();
-            });
-        }
     </script>
 </body>
+</html>
 </html>
