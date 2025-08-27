@@ -4,6 +4,7 @@ import com.goldresto.entity.Produit;
 import com.goldresto.repository.ProduitRepository;
 import com.goldresto.service.StorageService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -18,6 +19,7 @@ import java.util.UUID;
 
 @Controller
 @RequestMapping("/produits")
+@PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
 public class ProduitController {
 
     @Autowired

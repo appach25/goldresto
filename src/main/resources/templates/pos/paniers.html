@@ -40,7 +40,15 @@
     </nav>
 
     <div class="container mt-4">
-        <h2>Commandes en cours</h2>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>Commandes en cours</h2>
+            <div class="d-flex align-items-center">
+                <div class="input-group" style="width: 300px;">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="number" class="form-control" id="tableSearch" placeholder="Rechercher une table..." min="1">
+                </div>
+            </div>
+        </div>
         
         <div class="alert alert-danger" th:if="${error != null}">
             <i class="bi bi-exclamation-triangle me-2"></i>
@@ -53,7 +61,7 @@
 
         <div class="row mt-4 g-4" th:if="${not #lists.isEmpty(paniers)}">
             <div class="col-md-6 col-lg-4" th:each="panier : ${paniers}">
-                <div class="card h-100 shadow-sm">
+                <div class="card h-100 shadow-sm panier-card" th:data-table-number=${panier.numeroTable}>
                     <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                         <div class="d-flex align-items-center">
                             <i class="bi bi-table me-2"></i>
@@ -135,6 +143,21 @@
     
     <script th:inline="javascript">
         let currentPanierId = null;
+        
+        // Search functionality
+        document.getElementById('tableSearch').addEventListener('input', function(e) {
+            const searchValue = e.target.value;
+            const cards = document.querySelectorAll('.panier-card');
+            
+            cards.forEach(card => {
+                const tableNumber = card.getAttribute('data-table-number');
+                if (!searchValue || tableNumber.includes(searchValue)) {
+                    card.style.display = '';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        });
 
         function processPaiement(panierId, total) {
             currentPanierId = panierId;

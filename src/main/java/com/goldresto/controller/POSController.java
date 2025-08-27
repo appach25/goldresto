@@ -4,10 +4,12 @@ import java.util.List;
 
 import com.goldresto.entity.*;
 import com.goldresto.repository.*;
+import com.goldresto.service.StockService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -19,6 +21,7 @@ import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/pos")
+@PreAuthorize("hasAnyRole('EMPLOYEE', 'ADMIN', 'OWNER')")
 public class POSController {
     private static final Logger logger = LoggerFactory.getLogger(POSController.class);
 
@@ -37,6 +40,9 @@ public class POSController {
     @Autowired
     private JournalRepository journalRepository;
 
+    @Autowired
+    private StockService stockService;
+
     @GetMapping
     public String posInterface(Model model) {
         model.addAttribute("produits", produitRepository.findAll());
@@ -45,12 +51,6 @@ public class POSController {
         return "pos/index";
     }
 
-    @GetMapping("/")
-    public String index(Model model) {
-        List<Produit> produits = produitRepository.findAll();
-        model.addAttribute("produits", produits);
-        return "pos/index";
-    }
 
     @GetMapping("/paniers")
     @Transactional(readOnly = true)
@@ -107,6 +107,11 @@ public class POSController {
         Produit produit = produitRepository.findById(produitId)
             .orElseThrow(() -> new IllegalArgumentException("Invalid produit ID"));
 
+        // Check stock availability
+        if (produit.getStock() < quantite) {
+            return ResponseEntity.badRequest().body("Stock insuffisant. Disponible: " + produit.getStock());
+        }
+
         // Look for existing LignedeProduit with the same product
         Optional<LignedeProduit> existingLigne = panier.getLignesProduits().stream()
             .filter(l -> l.getProduit().getId().equals(produitId))
@@ -115,7 +120,15 @@ public class POSController {
         if (existingLigne.isPresent()) {
             // Update existing line
             LignedeProduit ligne = existingLigne.get();
-            ligne.setQuantite(ligne.getQuantite() + quantite);
+            int newQuantity = ligne.getQuantite() + quantite;
+            
+            // Check if total quantity exceeds stock
+            if (produit.getStock() < newQuantity) {
+                return ResponseEntity.badRequest().body("Stock insuffisant pour ajouter " + quantite + 
+                    " produits supplémentaires. Disponible: " + produit.getStock());
+            }
+            
+            ligne.setQuantite(newQuantity);
             ligne.setPrixUnitaire(produit.getPrix());
             ligne.calculateSousTotal();
             lignedeProduitRepository.save(ligne);
@@ -130,6 +143,9 @@ public class POSController {
             lignedeProduitRepository.save(ligne);
             panier.getLignesProduits().add(ligne);
         }
+
+        // Decrease stock
+        stockService.checkAndDecreaseStock(produit, quantite);
 
         panier.calculateTotal();
         panier = panierRepository.save(panier);

@@ -37,7 +37,26 @@
     </style>
 </head>
 <body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
     <div class="container-fluid">
+        <a class="navbar-brand" href="/pos">Gold Resto POS</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a class="nav-link active" href="/pos">Point de Vente</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/pos/paniers">Gestion des Paniers</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<div class="container-fluid">
         <div class="row">
             
 
@@ -63,6 +82,11 @@
                                 </p>
                                 <p class="card-text">
                                     <strong class="text-end" th:text="'$' + ${#numbers.formatDecimal(produit.prix, 1, 2)}">$0.00</strong>
+                                </p>
+                                <p class="card-text">
+                                    <small th:class="${produit.stock <= 10 ? 'text-danger' : 'text-muted'}">
+                                        Stock: <span th:text="${produit.stock}"></span>
+                                    </small>
                                 </p>
                             </div>
                         </div>
@@ -292,12 +316,11 @@
 
         async function validatePanier() {
             const tableNumber = document.getElementById('tableNumber').value;
-            if (!tableNumber || cartItems.size === 0) {
-                alert('Veuillez sélectionner une table et des produits');
+            if (!tableNumber) {
+                alert('Veuillez entrer un numéro de table');
                 return;
             }
 
-            // Only validate table number if creating a new panier (no currentPanier or currentPanier.id)
             if (!currentPanier || !currentPanier.id) {
                 const isTableValid = await validateTableNumber(tableNumber);
                 if (!isTableValid) {
@@ -309,19 +332,34 @@
             // If editing or adding product to existing panier, skip table number validation
             if (currentPanier && currentPanier.id) {
                 const promises = [];
-                cartItems.forEach((item, produitId) => {
-                    promises.push(
-                        fetch(`/pos/panier/${currentPanier.id}/addProduct?produitId=${produitId}&quantite=${item.quantity}`, {
+                for (const [produitId, item] of cartItems) {
+                    try {
+                        const response = await fetch(`/pos/panier/${currentPanier.id}/addProduct?produitId=${produitId}&quantite=${item.quantity}`, {
                             method: 'POST'
-                        })
-                        .then(response => {
-                            if (!response.ok) {
-                                throw new Error(`Failed to add product ${produitId}`);
+                        });
+                        
+                        if (!response.ok) {
+                            const errorText = await response.text();
+                            alert(errorText);
+                            return;
+                        }
+                        
+                        // Update stock display after successful addition
+                        const stockSpan = document.querySelector(`#produit_${produitId} .stock-count`);
+                        if (stockSpan) {
+                            const newStock = parseInt(stockSpan.textContent) - item.quantity;
+                            stockSpan.textContent = newStock;
+                            const smallElement = stockSpan.closest('small');
+                            if (newStock <= 10) {
+                                smallElement.classList.remove('text-muted');
+                                smallElement.classList.add('text-danger');
                             }
-                            return response.json();
-                        })
-                    );
-                });
+                        }
+                    } catch (error) {
+                        alert('Erreur lors de l\'ajout du produit: ' + error.message);
+                        return;
+                    }
+                }
 
                 await Promise.all(promises);
                 clearInterface();

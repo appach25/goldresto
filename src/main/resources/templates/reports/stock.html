@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Stock Report - Gold Resto</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+</head>
+<body>
+    <div th:replace="fragments/navbar :: navbar"></div>
+    
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>Stock Report</h2>
+            <a href="/reports" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
+            </a>
+        </div>
+        
+        <!-- Summary Card -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <h5>Total Products</h5>
+                        <h3 th:text="${stockData.size()}">0</h3>
+                    </div>
+                    <div class="col-md-4">
+                        <h5>Total Stock Value</h5>
+                        <h3>$<span th:text="${#numbers.formatDecimal(totalStockValue, 0, 'COMMA', 2, 'POINT')}">0.00</span></h3>
+                    </div>
+                    <div class="col-md-4">
+                        <h5>Low Stock Items</h5>
+                        <h3 th:text="${stockData.stream().filter(p -> p.stock <= 10).count()}">0</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Stock Data -->
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Stock</th>
+                                <th>Unit Price</th>
+                                <th>Total Value</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="item : ${stockData}">
+                                <td th:text="${item.name}"></td>
+                                <td>
+                                    <span th:text="${item.stock}"
+                                          th:class="${item.stock <= 10 ? 'badge bg-danger' : 'badge bg-success'}">
+                                    </span>
+                                </td>
+                                <td>$<span th:text="${#numbers.formatDecimal(item.price, 0, 'COMMA', 2, 'POINT')}"></span></td>
+                                <td>$<span th:text="${#numbers.formatDecimal(item.value, 0, 'COMMA', 2, 'POINT')}"></span></td>
+                                <td>
+                                    <span th:if="${item.stock <= 10}" class="badge bg-danger">Low Stock</span>
+                                    <span th:if="${item.stock > 10 && item.stock <= 20}" class="badge bg-warning">Medium</span>
+                                    <span th:if="${item.stock > 20}" class="badge bg-success">Good</span>
+                                </td>
+                            </tr>
+                            <tr th:if="${stockData.empty}">
+                                <td colspan="5" class="text-center">No products found</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
