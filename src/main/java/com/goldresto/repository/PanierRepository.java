@@ -10,6 +10,9 @@ import java.util.Optional;
 
 @Repository
 public interface PanierRepository extends JpaRepository<Panier, Long> {
+    @Query("SELECT p.id, p.total, SUM(l.sousTotal) as calculatedTotal FROM Panier p LEFT JOIN p.lignesProduits l WHERE p.id = :panierId GROUP BY p.id")
+    Object[] validatePanierTotal(Long panierId);
+
     List<Panier> findByState(PanierState state);
     
     @Query("SELECT DISTINCT p FROM Panier p LEFT JOIN FETCH p.lignesProduits l LEFT JOIN FETCH l.produit WHERE p.state = :state ORDER BY p.date DESC")

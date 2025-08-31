@@ -37,24 +37,7 @@
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="/pos">Gold Resto POS</a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav">
-                <li class="nav-item">
-                    <a class="nav-link active" href="/pos">Point de Vente</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/pos/paniers">Gestion des Paniers</a>
-                </li>
-            </ul>
-        </div>
-    </div>
-</nav>
+    <div th:replace="fragments/navbar :: navbar"></div>
 
 <div class="container-fluid">
         <div class="row">
@@ -78,16 +61,13 @@
                                 <h6 class="card-title" th:text="${produit.nomProduit}">Nom du produit</h6>
                                 <p class="card-text">
                                     <span class="badge bg-info" th:text="${produit.categorie}">Catégorie</span>
-                                    <span class="badge bg-success" th:text="${produit.stock + ' en stock'}">Stock</span>
+                                    
                                 </p>
                                 <p class="card-text">
                                     <strong class="text-end" th:text="'$' + ${#numbers.formatDecimal(produit.prix, 1, 2)}">$0.00</strong>
                                 </p>
-                                <p class="card-text">
-                                    <small th:class="${produit.stock <= 10 ? 'text-danger' : 'text-muted'}">
-                                        Stock: <span th:text="${produit.stock}"></span>
-                                    </small>
-                                </p>
+                               
+                                
                             </div>
                         </div>
                     </div>
@@ -96,7 +76,7 @@
 
             <!-- Cart Section -->
             <div class="col-md-4 cart-section p-4">
-                <h4>Panier en cours</h4>
+                <h4>COMMANDE</h4>
                 
                 <!-- Table Number -->
                 <div class="mb-4">
@@ -121,31 +101,7 @@
                     </div>
                 </div>
 
-                <!-- Paniers en cours list -->
-                <div class="mt-4 border-top pt-4">
-                    <h5 class="mb-3">Paniers en cours</h5>
-                    <div class="list-group">
-                        <div th:each="panier : ${paniersEnCours}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center mb-2">
-                            <div>
-                                <h6 class="mb-1">Table [[${panier.numeroTable}]]</h6>
-                                <small class="text-muted">Total: $[[${#numbers.formatDecimal(panier.total,1,2)}]]</small>
-                            </div>
-                            <div class="btn-group">
-                                <button class="btn btn-outline-primary"
-                                        th:onclick="|editPanier(${panier.id})|"
-                                        title="Modifier le panier existant">
-                                    <i class="bi bi-pencil"></i> Modifier
-                                </button>
-                                <button class="btn btn-success"
-                                        th:onclick="|editPanier(${panier.id}, true)|"
-                                        title="Ajouter de nouveaux produits">
-                                    <i class="bi bi-plus-circle"></i> Ajouter
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+                
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/decimal.js/10.4.3/decimal.min.js"></script>
@@ -203,6 +159,17 @@
             }
         }
 
+        async function fetchPanierTotal(panierId) {
+            try {
+                const response = await fetch(`/pos/panier/${panierId}/total`);
+                if (!response.ok) throw new Error('Erreur lors du calcul du total');
+                const total = await response.json();
+                document.getElementById('cartTotal').textContent = '$' + Number(total).toFixed(2);
+            } catch (error) {
+                document.getElementById('cartTotal').textContent = '$0.00';
+            }
+        }
+
         function updateCartDisplay() {
             const cartList = document.getElementById('cartItemsList');
             cartList.innerHTML = '';
@@ -236,7 +203,13 @@
                 }
             });
 
-            document.getElementById('cartTotal').textContent = '$' + total.toFixed(2);
+            // Always fetch backend total for existing panier
+            if (currentPanier && currentPanier.id) {
+                fetchPanierTotal(currentPanier.id);
+            } else {
+                // Only show frontend total for new paniers not yet saved
+                document.getElementById('cartTotal').textContent = '$' + total.toFixed(2);
+            }
         }
 
         async function validateTableNumber(tableNumber) {
@@ -334,7 +307,8 @@
                 const promises = [];
                 for (const [produitId, item] of cartItems) {
                     try {
-                        const response = await fetch(`/pos/panier/${currentPanier.id}/addProduct?produitId=${produitId}&quantite=${item.quantity}`, {
+                        const frontendTotal = parseFloat(document.getElementById('cartTotal').textContent.replace('$', ''));
+                        const response = await fetch(`/pos/panier/${currentPanier.id}/addProduct?produitId=${produitId}&quantite=${item.quantity}&frontendTotal=${frontendTotal}`, {
                             method: 'POST'
                         });
                         
@@ -362,15 +336,44 @@
                 }
 
                 await Promise.all(promises);
+
+                // Send frontend total to backend when validating
+                try {
+                    const frontendTotal = parseFloat(document.getElementById('cartTotal').textContent.replace('$', ''));
+                    await fetch(`/pos/panier/${currentPanier.id}/validate?total=${frontendTotal}`, {
+                        method: 'POST'
+                    });
+                } catch (error) {
+                    alert('Erreur lors de la validation du panier');
+                    return;
+                }
+
                 clearInterface();
                 alert('Panier modifié avec succès !');
                 return;
             }
 
-            // Otherwise, create a new panier
+            // Create a new panier with products
+            const products = [];
+            let total = new Decimal(0);
+            
+            cartItems.forEach((item, produitId) => {
+                const prixUnitaire = new Decimal(item.produit.prix);
+                const sousTotal = prixUnitaire.times(item.quantity);
+                total = total.plus(sousTotal);
+                
+                products.push({
+                    produitId: produitId,
+                    quantite: item.quantity,
+                    prixUnitaire: prixUnitaire.toNumber()
+                });
+            });
+
             const panier = {
                 numeroTable: parseInt(tableNumber),
-                state: 'EN_COURS'
+                state: 'EN_COURS',
+                products: products,
+                total: total.toNumber()
             };
 
             fetch('/pos/panier/create', {
@@ -380,26 +383,11 @@
                 },
                 body: JSON.stringify(panier)
             })
-            .then(response => response.json())
-            .then(newPanier => {
-                currentPanier = newPanier;
-                const promises = [];
-
-                cartItems.forEach((item, produitId) => {
-                    promises.push(
-                        fetch(`/pos/panier/${newPanier.id}/addProduct?produitId=${produitId}&quantite=${item.quantity}`, {
-                            method: 'POST'
-                        })
-                        .then(response => {
-                            if (!response.ok) {
-                                throw new Error(`Failed to add product ${produitId}`);
-                            }
-                            return response.json();
-                        })
-                    );
-                });
-
-                return Promise.all(promises);
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to create panier');
+                }
+                return response.json();
             })
             .then(() => {
                 clearInterface();
@@ -411,6 +399,7 @@
             cartItems.clear();
             currentPanier = null;
             document.getElementById('tableNumber').value = '1';
+            document.getElementById('cartTotal').textContent = '$0.00'; // Reset total on clear
             updateCartDisplay();
         }
 

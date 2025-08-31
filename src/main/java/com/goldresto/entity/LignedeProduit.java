@@ -80,17 +80,34 @@ public class LignedeProduit {
         this.sousTotal = sousTotal;
     }
 
-    @PrePersist
-    @PreUpdate
     public void calculateSousTotal() {
         logger.debug("Calculating sousTotal for LignedeProduit {} with quantite={} and prixUnitaire={}",
             id, quantite, prixUnitaire);
-        if (quantite != null && prixUnitaire != null) {
+
+        // Validate and initialize values if needed
+        if (quantite == null) {
+            quantite = 0;
+            logger.warn("Null quantite found for LignedeProduit {}, setting to 0", id);
+        }
+
+        // Use the set prixUnitaire, don't override it
+        if (prixUnitaire == null) {
+            if (produit != null && produit.getPrix() != null) {
+                prixUnitaire = produit.getPrix();
+                logger.debug("Using product price {} for LignedeProduit {}", prixUnitaire, id);
+            } else {
+                prixUnitaire = BigDecimal.ZERO;
+                logger.warn("No price available for LignedeProduit {}, setting to 0", id);
+            }
+        }
+
+        // Calculate sous-total
+        try {
             this.sousTotal = prixUnitaire.multiply(BigDecimal.valueOf(quantite));
             logger.debug("Calculated sousTotal={} for LignedeProduit {}", sousTotal, id);
-        } else {
+        } catch (Exception e) {
+            logger.error("Error calculating sousTotal for LignedeProduit {}: {}", id, e.getMessage());
             this.sousTotal = BigDecimal.ZERO;
-            logger.debug("Set sousTotal to 0 due to null quantite or prixUnitaire for LignedeProduit {}", id);
         }
     }
 }

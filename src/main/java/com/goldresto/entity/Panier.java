@@ -17,10 +17,22 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 @JsonInclude(JsonInclude.Include.ALWAYS)
 public class Panier {
     private static final Logger logger = LoggerFactory.getLogger(Panier.class);
-    @PrePersist
-    @PreUpdate
     public void calculateTotal() {
+        logger.debug("Calculating total for Panier {}", id);
+        
+        // First ensure all lignes have valid sous-totals
+        if (lignesProduits != null) {
+            for (LignedeProduit ligne : lignesProduits) {
+                if (ligne != null) {
+                    ligne.calculateSousTotal();
+                    logger.debug("Ligne {} sous-total: {}", ligne.getId(), ligne.getSousTotal());
+                }
+            }
+        }
+
+        // Now sum all sous-totals
         this.total = sumSousTotal();
+        logger.debug("New total for Panier {}: {}", id, total);
     }
 
     /**
@@ -28,10 +40,16 @@ public class Panier {
      */
     public BigDecimal sumSousTotal() {
         if (lignesProduits == null) return BigDecimal.ZERO;
-        return lignesProduits.stream()
-            .filter(l -> l != null && l.getSousTotal() != null)
-            .map(LignedeProduit::getSousTotal)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        BigDecimal sum = BigDecimal.ZERO;
+        for (LignedeProduit ligne : lignesProduits) {
+            if (ligne != null && ligne.getSousTotal() != null) {
+                sum = sum.add(ligne.getSousTotal());
+                logger.debug("Adding sous-total {} for ligne {}, running sum: {}", 
+                    ligne.getSousTotal(), ligne.getId(), sum);
+            }
+        }
+        return sum;
     }
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -146,6 +164,14 @@ public class Panier {
 
     @Transactional
     public void addLigneProduit(LignedeProduit newLigne) {
+        logger.debug("Adding ligne produit to Panier {}", id);
+        
+        // Validate inputs
+        if (newLigne == null || newLigne.getProduit() == null) {
+            logger.error("Cannot add null ligne or ligne with null produit to Panier {}", id);
+            return;
+        }
+
         // Find existing line with same product
         LignedeProduit existingLigne = lignesProduits.stream()
             .filter(l -> l.getProduit().getId().equals(newLigne.getProduit().getId()))
@@ -153,12 +179,14 @@ public class Panier {
             .orElse(null);
 
         if (existingLigne != null) {
+            logger.debug("Found existing ligne for produit {} in Panier {}", 
+                newLigne.getProduit().getId(), id);
             int newQuantite = existingLigne.getQuantite() + newLigne.getQuantite();
             existingLigne.setQuantite(newQuantite);
             existingLigne.calculateSousTotal();
-            System.out.println("\n>> Adding new product to Panier " + this.id);
-            this.calculateTotal();
         } else {
+            logger.debug("Adding new ligne for produit {} to Panier {}", 
+                newLigne.getProduit().getId(), id);
             if (newLigne.getProduit() != null && newLigne.getProduit().getPrix() != null) {
                 newLigne.setPrixUnitaire(newLigne.getProduit().getPrix());
                 newLigne.calculateSousTotal(); 
@@ -168,16 +196,25 @@ public class Panier {
             }
             lignesProduits.add(newLigne);
             newLigne.setPanier(this);
-            System.out.println("\n>> Adding new product to Panier " + this.id);
-            this.calculateTotal();
         }
+
+        // Always recalculate total after modifying lignes
+        updateAllSousTotals();
+        calculateTotal();
+        logger.debug("Updated Panier {} total to {} after adding ligne", id, total);
     }
 
     @Transactional
     public void removeLigneProduit(LignedeProduit ligne) {
-        lignesProduits.remove(ligne);
-        ligne.setPanier(null);
-        recalculateTotal();
+        if (ligne != null) {
+            logger.debug("Removing ligne {} from Panier {}", ligne.getId(), id);
+            lignesProduits.remove(ligne);
+            ligne.setPanier(null);
+            ligne.setSousTotal(BigDecimal.ZERO);
+            updateAllSousTotals();
+            calculateTotal();
+            logger.debug("Updated Panier {} total to {} after removing ligne", id, total);
+        }
     }
 }
 
