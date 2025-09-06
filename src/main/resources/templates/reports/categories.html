@@ -187,7 +187,10 @@
                                 const value = context.raw;
                                 const total = context.dataset.data.reduce((a, b) => a + b, 0);
                                 const percentage = ((value / total) * 100).toFixed(1);
-                                return `${context.label}: $${value.toFixed(2)} (${percentage}%)`;
+                                return `${context.label}: ${new Intl.NumberFormat('en-US', {
+                                    style: 'currency',
+                                    currency: 'USD'
+                                }).format(value)} (${percentage}%)`;
                             }
                         }
                     }
