@@ -302,16 +302,19 @@ public class ReportService {
     }
 
     public Map<String, Object> getEmployeePerformanceReport(LocalDate startDate, LocalDate endDate) {
+        // Initialize with default dates if not provided
         if (startDate == null || endDate == null) {
             startDate = LocalDate.now().minusMonths(1);
             endDate = LocalDate.now();
         }
 
+        // Get orders for the period
         List<Panier> paniers = panierRepository.findByDateBetween(
             startDate.atStartOfDay(),
             endDate.plusDays(1).atStartOfDay()
         );
 
+        // Initialize empty report if no orders
         if (paniers == null || paniers.isEmpty()) {
             Map<String, Object> report = new HashMap<>();
             report.put("startDate", startDate);
@@ -329,7 +332,6 @@ public class ReportService {
         Map<User, EmployeeMetrics> employeeMetrics = new HashMap<>();
         
         for (Panier panier : paniers) {
-            // Get the employee from the panier or use a default one
             User employee = panier.getUser();
             if (employee == null) {
                 employee = new User();
@@ -340,24 +342,22 @@ public class ReportService {
             }
             
             employeeMetrics.computeIfAbsent(employee, k -> new EmployeeMetrics())
-                .addOrder(panier.getTotal() != null ? panier.getTotal() : BigDecimal.ZERO,
-                         panier.getLignesProduits() != null ? panier.getLignesProduits().size() : 0);
+                .addOrder(panier.getTotal());
         }
 
-        // Calculate employee performance
+        // Convert to list and sort by revenue
         List<Map<String, Object>> employeePerformance = employeeMetrics.entrySet().stream()
             .map(entry -> {
                 Map<String, Object> employeeMap = new HashMap<>();
                 employeeMap.put("employee", entry.getKey());
                 employeeMap.put("ordersProcessed", entry.getValue().getOrdersProcessed());
                 employeeMap.put("totalRevenue", entry.getValue().getTotalRevenue());
-                employeeMap.put("averageOrderValue", entry.getValue().getAverageOrderValue());
-                employeeMap.put("itemsPerOrder", entry.getValue().getAverageItemsPerOrder());
                 return employeeMap;
             })
             .sorted((m1, m2) -> ((BigDecimal)m2.get("totalRevenue")).compareTo((BigDecimal)m1.get("totalRevenue")))
             .collect(Collectors.toList());
 
+        // Build final report
         Map<String, Object> result = new HashMap<>();
         result.put("startDate", startDate);
         result.put("endDate", endDate);
@@ -398,24 +398,16 @@ public class ReportService {
     private static class EmployeeMetrics {
         private int ordersProcessed = 0;
         private BigDecimal totalRevenue = BigDecimal.ZERO;
-        private int totalItems = 0;
 
-        void addOrder(BigDecimal amount, int items) {
+        void addOrder(BigDecimal amount) {
             ordersProcessed++;
-            totalRevenue = totalRevenue.add(amount);
-            totalItems += items;
+            if (amount != null) {
+                totalRevenue = totalRevenue.add(amount);
+            }
         }
 
         int getOrdersProcessed() { return ordersProcessed; }
         BigDecimal getTotalRevenue() { return totalRevenue; }
-        BigDecimal getAverageOrderValue() {
-            return ordersProcessed > 0 
-                ? totalRevenue.divide(BigDecimal.valueOf(ordersProcessed), 2, BigDecimal.ROUND_HALF_UP)
-                : BigDecimal.ZERO;
-        }
-        double getAverageItemsPerOrder() {
-            return ordersProcessed > 0 ? (double) totalItems / ordersProcessed : 0;
-        }
     }
 
     // Helper methods
