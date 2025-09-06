@@ -183,9 +183,9 @@
                         callbacks: {
                             label: function(context) {
                                 let value = context.parsed.y;
-                                return new Intl.NumberFormat('fr-FR', {
+                                return new Intl.NumberFormat('en-US', {
                                     style: 'currency',
-                                    currency: 'EUR'
+                                    currency: 'USD'
                                 }).format(value);
                             }
                         }
@@ -196,9 +196,9 @@
                         beginAtZero: true,
                         ticks: {
                             callback: function(value) {
-                                return new Intl.NumberFormat('fr-FR', {
+                                return new Intl.NumberFormat('en-US', {
                                     style: 'currency',
-                                    currency: 'EUR',
+                                    currency: 'USD',
                                     maximumFractionDigits: 0
                                 }).format(value);
                             }
@@ -255,9 +255,9 @@
                                     const dataset = data.datasets[0];
                                     const total = dataset.data.reduce((acc, value) => acc + value, 0);
                                     return data.labels.map((label, i) => ({
-                                        text: `${label} (${new Intl.NumberFormat('fr-FR', {
+                                        text: `${label} (${new Intl.NumberFormat('en-US', {
                                             style: 'currency',
-                                            currency: 'EUR'
+                                            currency: 'USD'
                                         }).format(dataset.data[i])})`,
                                         fillStyle: dataset.backgroundColor[i],
                                         hidden: isNaN(dataset.data[i]),
@@ -274,9 +274,9 @@
                                 const value = context.raw;
                                 const total = context.dataset.data.reduce((acc, val) => acc + val, 0);
                                 const percentage = ((value / total) * 100).toFixed(1);
-                                return `${context.label}: ${new Intl.NumberFormat('fr-FR', {
+                                return `${context.label}: ${new Intl.NumberFormat('en-US', {
                                     style: 'currency',
-                                    currency: 'EUR'
+                                    currency: 'USD'
                                 }).format(value)} (${percentage}%)`;
                             }
                         }
