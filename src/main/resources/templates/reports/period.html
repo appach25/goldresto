@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Rapport périodique - Gold Resto</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    <link href="/css/main.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div th:replace="fragments/navbar :: navbar"></div>
+    
+    <div class="container-fluid mt-4 px-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>Rapport périodique</h2>
+            <div class="btn-group">
+                <a href="/reports" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Retour au tableau de bord
+                </a>
+                <input type="date" class="form-control" id="startDate" 
+                       th:value="${#temporals.format(report.startDate, 'yyyy-MM-dd')}">
+                <input type="date" class="form-control" id="endDate" 
+                       th:value="${#temporals.format(report.endDate, 'yyyy-MM-dd')}">
+                <select class="form-select" id="periodType">
+                    <option value="day">Jour</option>
+                    <option value="week">Semaine</option>
+                    <option value="month">Mois</option>
+                    <option value="year">Année</option>
+                </select>
+                <button class="btn btn-primary" onclick="updatePeriod()">Appliquer</button>
+            </div>
+        </div>
+
+        <!-- Current vs Previous Period -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Période actuelle</h5>
+                        <small class="text-muted" th:text="${report != null && report.startDate != null ? #temporals.format(report.startDate, 'dd/MM/yyyy') : ''} + ' - ' + ${report != null && report.endDate != null ? #temporals.format(report.endDate, 'dd/MM/yyyy') : ''}">01/01/2025 - 31/01/2025</small>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="text-muted">Chiffre d'affaires</label>
+                                    <h3>$<span th:text="${report != null && report.revenue != null ? #numbers.formatDecimal(report.revenue, 0, 'COMMA', 2, 'POINT') : '0.00'}">0.00</span></h3>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="text-muted">Nombre de commandes</label>
+                                    <h3 th:text="${report != null ? report.orderCount : 0}">0</h3>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="text-muted">Panier moyen</label>
+                                    <h3>$<span th:text="${report != null && report.orderCount > 0 && report.revenue != null ? #numbers.formatDecimal(report.revenue / report.orderCount, 0, 'COMMA', 2, 'POINT') : '0.00'}">0.00</span></h3>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="text-muted">CA journalier moyen</label>
+                                    <h3>$<span th:text="${report != null && report.revenue != null && report.startDate != null && report.endDate != null ? #numbers.formatDecimal(report.revenue / T(java.time.temporal.ChronoUnit).DAYS.between(report.startDate, report.endDate.plusDays(1)), 0, 'COMMA', 2, 'POINT') : '0.00'}">0.00</span></h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Période précédente</h5>
+                        <small class="text-muted" th:if="${report.previousPeriod != null}" th:text="${#temporals.format(report.previousPeriod.startDate, 'dd/MM/yyyy')} + ' - ' + ${#temporals.format(report.previousPeriod.endDate, 'dd/MM/yyyy')}">01/12/2024 - 31/12/2024</small>
+                        <small class="text-muted" th:unless="${report.previousPeriod != null}">Pas de période précédente</small>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="text-muted">Chiffre d'affaires</label>
+                                    <h3>$<span th:text="${report.previousPeriod != null ? #numbers.formatDecimal(report.previousPeriod.revenue, 0, 'COMMA', 2, 'POINT') : '0.00'}">0.00</span></h3>
+                                    <small th:with="prevRevenue=${report.previousPeriod != null ? report.previousPeriod.revenue : 0},
+                                                  growth=${prevRevenue > 0 ? ((report.revenue - prevRevenue) / prevRevenue) * 100 : 0}"
+                                           th:class="${growth >= 0 ? 'text-success' : 'text-danger'}"
+                                           th:text="${growth >= 0 ? '+' : ''} + ${#numbers.formatDecimal(growth, 1, 1)} + '%'">+0.0%</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="text-muted">Nombre de commandes</label>
+                                    <h3 th:text="${report.previousPeriod != null ? report.previousPeriod.orderCount : 0}">0</h3>
+                                    <small th:with="prevCount=${report.previousPeriod != null ? report.previousPeriod.orderCount : 0},
+                                                  growth=${prevCount > 0 ? ((report.orderCount - prevCount) / prevCount) * 100 : 0}"
+                                           th:class="${growth >= 0 ? 'text-success' : 'text-danger'}"
+                                           th:text="${growth >= 0 ? '+' : ''} + ${#numbers.formatDecimal(growth, 1, 1)} + '%'">+0.0%</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="text-muted">Panier moyen</label>
+                                    <h3>$<span th:text="${report != null && report.previousPeriod != null && report.previousPeriod.orderCount > 0 ? #numbers.formatDecimal(report.previousPeriod.revenue / report.previousPeriod.orderCount, 0, 'COMMA', 2, 'POINT') : '0.00'}">0.00</span></h3>
+                                    <small th:with="currentAvg=${report != null && report.orderCount > 0 && report.revenue != null ? report.revenue / report.orderCount : 0},
+                                                  prevAvg=${report != null && report.previousPeriod != null && report.previousPeriod.orderCount > 0 && report.previousPeriod.revenue != null ? report.previousPeriod.revenue / report.previousPeriod.orderCount : 0},
+                                                  growth=${prevAvg > 0 ? ((currentAvg - prevAvg) / prevAvg) * 100 : 0}"
+                                           th:class="${growth >= 0 ? 'text-success' : 'text-danger'}"
+                                           th:text="${growth >= 0 ? '+' : ''} + ${#numbers.formatDecimal(growth, 1, 1)} + '%'">+0.0%</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="text-muted">CA journalier moyen</label>
+                                    <h3>$<span th:text="${report.previousPeriod != null ? #numbers.formatDecimal(report.previousPeriod.revenue / T(java.time.temporal.ChronoUnit).DAYS.between(report.previousPeriod.startDate, report.previousPeriod.endDate.plusDays(1)), 0, 'COMMA', 2, 'POINT') : '0.00'}">0.00</span></h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trend Chart -->
+        <div class="row">
+            <div class="col-12 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Tendance des ventes</h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="trendChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script th:inline="javascript">
+        // Set initial period type
+        document.getElementById('periodType').value = /*[[${param.periodType?:'day'}]]*/ 'day';
+
+        // Update period function
+        function updatePeriod() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const periodType = document.getElementById('periodType').value;
+            window.location.href = `/reports/period?startDate=${startDate}&endDate=${endDate}&periodType=${periodType}`;
+        }
+
+        // Sales trend chart
+        const trendData = /*[[${report != null && report.trends != null ? report.trends : {}}]]*/ {};
+        const chartCanvas = document.getElementById('trendChart');
+        const ctx = chartCanvas.getContext('2d');
+
+        // Clear any existing chart
+        if (window.trendChart) {
+            window.trendChart.destroy();
+        }
+
+        // Create new chart
+        window.trendChart = new Chart(chartCanvas, {
+            type: 'line',
+            data: {
+                labels: Object.keys(trendData),
+                datasets: [{
+                    label: 'Ventes',
+                    data: Object.values(trendData),
+                    borderColor: 'rgb(75, 192, 192)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                    tension: 0.1,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: value => '$' + value.toFixed(2)
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: context => '$' + context.raw.toFixed(2)
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

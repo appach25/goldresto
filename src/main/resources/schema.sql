@@ -22,3 +22,8 @@ CREATE TABLE IF NOT EXISTS user_roles (
     FOREIGN KEY (user_id) REFERENCES users(id),
     FOREIGN KEY (role_id) REFERENCES roles(id)
 );
+
+-- Add user_id to paniers table
+ALTER TABLE IF EXISTS paniers
+    ADD COLUMN IF NOT EXISTS user_id BIGINT,
+    ADD CONSTRAINT fk_panier_user FOREIGN KEY (user_id) REFERENCES users(id);

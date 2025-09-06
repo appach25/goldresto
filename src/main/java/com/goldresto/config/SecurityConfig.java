@@ -27,17 +27,17 @@ public class SecurityConfig {
                 .requestMatchers("/login", "/error").permitAll()
                 
                 // POS and Sales (Employee access)
-                .requestMatchers("/pos/**").hasAnyRole("EMPLOYEE", "ADMIN", "OWNER")
-                .requestMatchers("/panier/**").hasAnyRole("EMPLOYEE", "ADMIN", "OWNER")
+                .requestMatchers("/pos/**").hasAnyAuthority("ROLE_EMPLOYEE", "ROLE_ADMIN", "ROLE_OWNER")
+                .requestMatchers("/panier/**").hasAnyAuthority("ROLE_EMPLOYEE", "ROLE_ADMIN", "ROLE_OWNER")
                 
                 // Product and Stock Management (Admin access)
-                .requestMatchers("/produits/**").hasAnyRole("ADMIN", "OWNER")
-                .requestMatchers("/stock/**").hasAnyRole("ADMIN", "OWNER")
+                .requestMatchers("/produits/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_OWNER")
+                .requestMatchers("/stock/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_OWNER")
                 
                 // Reports and System Management (Owner only)
-                .requestMatchers("/reports/**").hasRole("OWNER")
-                .requestMatchers("/users/**").hasRole("OWNER")
-                .requestMatchers("/system/**").hasRole("OWNER")
+                .requestMatchers("/reports/**").hasAuthority("ROLE_OWNER")
+                .requestMatchers("/users/**").hasAuthority("ROLE_OWNER")
+                .requestMatchers("/system/**").hasAuthority("ROLE_OWNER")
                 
                 // All other URLs require authentication
                 .anyRequest().authenticated()

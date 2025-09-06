@@ -5,68 +5,108 @@
     <title>Reports Dashboard - Gold Resto</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    <link href="/css/main.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <div th:replace="fragments/navbar :: navbar"></div>
+    <div th:replace="~{fragments/navbar :: navbar}"></div>
     
-    <div class="container mt-4">
-        <h2 class="mb-4">Reports Dashboard</h2>
+    <div class="container-fluid mt-4 px-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>Tableau de bord des ventes</h2>
+            <div class="btn-group">
+                <a th:href="@{/reports/daily}" class="btn btn-outline-primary">Rapport journalier</a>
+                <a th:href="@{/reports/period}" class="btn btn-outline-primary">Rapport périodique</a>
+                <a th:href="@{/reports/products}" class="btn btn-outline-primary">Analyse produits</a>
+                <a th:href="@{/reports/categories}" class="btn btn-outline-primary">Analyse catégories</a>
+                <a th:href="@{/reports/employees}" class="btn btn-outline-primary">Performance employés</a>
+            </div>
+        </div>
         
-        <!-- Summary Cards -->
+        <!-- Daily Summary Cards -->
         <div class="row mb-4">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="card bg-primary text-white">
                     <div class="card-body">
-                        <h5 class="card-title">Total Sales</h5>
-                        <h3 class="card-text">$<span th:text="${#numbers.formatDecimal(totalSales, 0, 'COMMA', 2, 'POINT')}">0.00</span></h3>
+                        <h5 class="card-title">Ventes du jour</h5>
+                        <h3 class="card-text">$<span th:text="${dailyReport != null && dailyReport.totalSales != null ? #numbers.formatDecimal(dailyReport.totalSales, 0, 'COMMA', 2, 'POINT') : '0.00'}">0.00</span></h3>
+                        <small>Commandes: <span th:text="${dailyReport != null ? dailyReport.orderCount : 0}">0</span></small>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="card bg-success text-white">
                     <div class="card-body">
-                        <h5 class="card-title">Total Orders</h5>
-                        <h3 class="card-text" th:text="${totalOrders}">0</h3>
+                        <h5 class="card-title">Chiffre d'affaires mensuel</h5>
+                        <h3 class="card-text">$<span th:text="${monthlyReport != null && monthlyReport.revenue != null ? #numbers.formatDecimal(monthlyReport.revenue, 0, 'COMMA', 2, 'POINT') : '0.00'}">0.00</span></h3>
+                        <small th:with="prevRevenue=${monthlyReport != null && monthlyReport.previousPeriod != null ? monthlyReport.previousPeriod.revenue : 0},
+                                      currentRevenue=${monthlyReport != null ? monthlyReport.revenue : 0},
+                                      growth=${prevRevenue > 0 ? ((currentRevenue - prevRevenue) / prevRevenue) * 100 : 0}" 
+                               th:text="${#numbers.formatDecimal(growth, 1, 1)} + '% vs mois dernier'">0%</small>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Commandes du mois</h5>
+                        <h3 class="card-text" th:text="${monthlyReport != null ? monthlyReport.orderCount : 0}">0</h3>
+                        <small>Panier moyen: $<span th:text="${monthlyReport != null && monthlyReport.orderCount > 0 ? #numbers.formatDecimal(monthlyReport.revenue / monthlyReport.orderCount, 0, 'COMMA', 2, 'POINT') : '0.00'}">0.00</span></small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
                 <div class="card bg-warning">
                     <div class="card-body">
-                        <h5 class="card-title">Low Stock Items</h5>
-                        <h3 class="card-text" th:text="${lowStockProducts.size()}">0</h3>
+                        <h5 class="card-title">Produits à surveiller</h5>
+                        <h3 class="card-text" th:text="${productReport != null && productReport.lowPerformers != null ? #lists.size(productReport.lowPerformers) : 0}">0</h3>
+                        <small>Faibles ventes ce mois</small>
                     </div>
                 </div>
             </div>
         </div>
         
-        <!-- Quick Reports -->
+        <!-- Analysis Section -->
         <div class="row">
-            <!-- Today's Sales -->
-            <div class="col-md-6 mb-4">
+            <!-- Sales Trend -->
+            <div class="col-md-8 mb-4">
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">Today's Sales</h5>
-                        <a href="/reports/sales" class="btn btn-sm btn-outline-primary">View Full Report</a>
+                        <h5 class="mb-0">Tendance des ventes</h5>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-secondary active" onclick="updateTrend('day')">Jour</button>
+                            <button class="btn btn-outline-secondary" onclick="updateTrend('week')">Semaine</button>
+                            <button class="btn btn-outline-secondary" onclick="updateTrend('month')">Mois</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="salesTrendChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Products -->
+            <div class="col-md-4 mb-4">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Produits les plus vendus</h5>
+                        <a th:href="@{/reports/products}" class="btn btn-sm btn-outline-primary">Voir détails</a>
                     </div>
                     <div class="card-body">
                         <div class="table-responsive">
-                            <table class="table">
+                            <table class="table table-sm">
                                 <thead>
                                     <tr>
-                                        <th>Time</th>
-                                        <th>Amount</th>
-                                        <th>Method</th>
+                                        <th>Produit</th>
+                                        <th>Quantité</th>
+                                        <th>CA</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr th:each="sale : ${todaySales}">
-                                        <td th:text="${#temporals.format(sale.time, 'HH:mm')}"></td>
-                                        <td>$<span th:text="${#numbers.formatDecimal(sale.amount, 0, 'COMMA', 2, 'POINT')}"></span></td>
-                                        <td th:text="${sale.method}"></td>
-                                    </tr>
-                                    <tr th:if="${todaySales.empty}">
-                                        <td colspan="3" class="text-center">No sales today</td>
+                                    <tr th:each="product : ${topProducts != null ? topProducts : {}}">
+                                        <td th:text="${product.product.nomProduit}"></td>
+                                        <td th:text="${product.quantitySold}"></td>
+                                        <td>$<span th:text="${#numbers.formatDecimal(product.revenue, 0, 'COMMA', 2, 'POINT')}"></span></td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -74,37 +114,41 @@
                     </div>
                 </div>
             </div>
-            
-            <!-- Low Stock Alert -->
-            <div class="col-md-6 mb-4">
+        </div>
+
+        <!-- Category Performance -->
+        <div class="row">
+            <div class="col-md-12 mb-4">
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">Low Stock Alert</h5>
-                        <a href="/reports/stock" class="btn btn-sm btn-outline-primary">View Stock Report</a>
+                        <h5 class="mb-0">Performance par catégorie</h5>
+                        <a th:href="@{/reports/categories}" class="btn btn-sm btn-outline-primary">Voir détails</a>
                     </div>
                     <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table">
-                                <thead>
-                                    <tr>
-                                        <th>Product</th>
-                                        <th>Stock</th>
-                                        <th>Price</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr th:each="product : ${lowStockProducts}">
-                                        <td th:text="${product.name}"></td>
-                                        <td>
-                                            <span class="badge bg-danger" th:text="${product.stock}"></span>
-                                        </td>
-                                        <td>$<span th:text="${#numbers.formatDecimal(product.price, 0, 'COMMA', 2, 'POINT')}"></span></td>
-                                    </tr>
-                                    <tr th:if="${lowStockProducts.empty}">
-                                        <td colspan="3" class="text-center">No low stock items</td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                        <div class="row">
+                            <div class="col-md-8">
+                                <canvas id="categoryChart"></canvas>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="table-responsive">
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>Catégorie</th>
+                                                <th>CA</th>
+                                                <th>%</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr th:each="cat : ${categoryPerformance != null ? categoryPerformance : {}}">
+                                                <td th:text="${cat.category}"></td>
+                                                <td>$<span th:text="${#numbers.formatDecimal(cat.revenue, 0, 'COMMA', 2, 'POINT')}"></span></td>
+                                                <td th:text="${#numbers.formatDecimal(cat.percentageOfTotal, 1, 1)} + '%'"></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -113,5 +157,186 @@
     </div>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script th:inline="javascript">
+        // Sales trend chart
+        const trendData = /*[[${monthlyReport.trends}]]*/ {};
+        const trendChart = new Chart(document.getElementById('salesTrendChart'), {
+            type: 'line',
+            data: {
+                labels: Object.keys(trendData) || [],
+                datasets: [{
+                    label: 'Ventes',
+                    data: Object.values(trendData) || [],
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.1,
+                    fill: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let value = context.parsed.y;
+                                return new Intl.NumberFormat('fr-FR', {
+                                    style: 'currency',
+                                    currency: 'EUR'
+                                }).format(value);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return new Intl.NumberFormat('fr-FR', {
+                                    style: 'currency',
+                                    currency: 'EUR',
+                                    maximumFractionDigits: 0
+                                }).format(value);
+                            }
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Handle initial error state if no data
+        if (!Object.keys(trendData).length) {
+            const chartCanvas = document.getElementById('salesTrendChart');
+            const ctx = chartCanvas.getContext('2d');
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#dc3545';
+            ctx.font = '14px Arial';
+            ctx.fillText('Aucune donnée disponible pour la période', chartCanvas.width/2, chartCanvas.height/2);
+        }
+
+        // Category performance chart
+        const categoryData = /*[[${categoryPerformance}]]*/ [];
+        const categoryChart = new Chart(document.getElementById('categoryChart'), {
+            type: 'doughnut',
+            data: {
+                labels: categoryData.map(cat => cat.category) || [],
+                datasets: [{
+                    data: categoryData.map(cat => cat.revenue) || [],
+                    backgroundColor: [
+                        '#FF6384',
+                        '#36A2EB',
+                        '#FFCE56',
+                        '#4BC0C0',
+                        '#9966FF',
+                        '#FF9F40'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            generateLabels: function(chart) {
+                                const data = chart.data;
+                                if (data.labels.length && data.datasets.length) {
+                                    const dataset = data.datasets[0];
+                                    const total = dataset.data.reduce((acc, value) => acc + value, 0);
+                                    return data.labels.map((label, i) => ({
+                                        text: `${label} (${new Intl.NumberFormat('fr-FR', {
+                                            style: 'currency',
+                                            currency: 'EUR'
+                                        }).format(dataset.data[i])})`,
+                                        fillStyle: dataset.backgroundColor[i],
+                                        hidden: isNaN(dataset.data[i]),
+                                        index: i
+                                    }));
+                                }
+                                return [];
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const value = context.raw;
+                                const total = context.dataset.data.reduce((acc, val) => acc + val, 0);
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return `${context.label}: ${new Intl.NumberFormat('fr-FR', {
+                                    style: 'currency',
+                                    currency: 'EUR'
+                                }).format(value)} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Handle initial error state if no data
+        if (!categoryData.length) {
+            const chartCanvas = document.getElementById('categoryChart');
+            const ctx = chartCanvas.getContext('2d');
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#dc3545';
+            ctx.font = '14px Arial';
+            ctx.fillText('Aucune donnée disponible pour la période', chartCanvas.width/2, chartCanvas.height/2);
+        }
+
+        // Update trend period
+        async function updateTrend(period) {
+            try {
+                const endDate = new Date().toISOString().split('T')[0];
+                const startDate = new Date();
+                startDate.setMonth(startDate.getMonth() - 1);
+                
+                const response = await fetch(`/reports/api/trends?startDate=${startDate.toISOString().split('T')[0]}&endDate=${endDate}&periodType=${period}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                
+                if (!data || !data.trends) {
+                    throw new Error('Invalid data format received');
+                }
+                
+                trendChart.data.labels = Object.keys(data.trends);
+                trendChart.data.datasets[0].data = Object.values(data.trends);
+                trendChart.update();
+
+                // Update active button
+                document.querySelectorAll('.btn-group button').forEach(btn => {
+                    btn.classList.remove('active');
+                    if (btn.textContent.toLowerCase().includes(period)) {
+                        btn.classList.add('active');
+                    }
+                });
+            } catch (error) {
+                console.error('Error updating trend:', error);
+                // Show error message to user
+                const chartCanvas = document.getElementById('salesTrendChart');
+                const ctx = chartCanvas.getContext('2d');
+                ctx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#dc3545';
+                ctx.font = '14px Arial';
+                ctx.fillText('Erreur lors du chargement des données', chartCanvas.width/2, chartCanvas.height/2);
+            }
+        }
+    </script>
 </body>
 </html>

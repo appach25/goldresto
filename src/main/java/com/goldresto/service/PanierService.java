@@ -9,6 +9,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import com.goldresto.entity.User;
+import com.goldresto.repository.UserRepository;
 import java.math.BigDecimal;
 
 @Service
@@ -21,8 +25,23 @@ public class PanierService {
     @Autowired
     private LignedeProduitRepository lignedeProduitRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
     @Transactional
     public Panier savePanier(Panier panier) {
+        // Set the current user as the owner of the panier
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (principal instanceof UserDetails) {
+            String username = ((UserDetails)principal).getUsername();
+            User currentUser = userRepository.findByUsername(username).orElse(null);
+            if (currentUser != null) {
+                panier.setUser(currentUser);
+            } else {
+                logger.warn("Could not find user {} for panier", username);
+            }
+        }
+
         // First save to ensure all IDs are assigned
         Panier savedPanier = panierRepository.save(panier);
         return savedPanier;
@@ -30,6 +49,18 @@ public class PanierService {
 
     @Transactional
     public Panier savePanierWithTotal(Panier panier, BigDecimal frontendTotal) {
+        // Set the current user as the owner of the panier
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (principal instanceof UserDetails) {
+            String username = ((UserDetails)principal).getUsername();
+            User currentUser = userRepository.findByUsername(username).orElse(null);
+            if (currentUser != null) {
+                panier.setUser(currentUser);
+            } else {
+                logger.warn("Could not find user {} for panier", username);
+            }
+        }
+
         panier.setTotal(frontendTotal);
         return panierRepository.save(panier);
     }

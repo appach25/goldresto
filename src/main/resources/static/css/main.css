@@ -1,0 +1,9 @@
+/* Main content padding for fixed navbar */
+body {
+    padding-top: 70px; /* Height of navbar plus some extra space */
+}
+
+/* Ensure navbar stays on top */
+.navbar.fixed-top {
+    z-index: 1030;
+}

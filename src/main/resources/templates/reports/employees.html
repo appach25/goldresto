@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Performance des employés - Gold Resto</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    <link href="/css/main.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div th:replace="fragments/navbar :: navbar"></div>
+    
+    <div class="container-fluid mt-4 px-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>Performance des employés</h2>
+            <div class="btn-group">
+                <a href="/reports" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Retour au tableau de bord
+                </a>
+                <input type="date" class="form-control" id="startDate" 
+                       th:value="${#temporals.format(report.startDate, 'yyyy-MM-dd')}">
+                <input type="date" class="form-control" id="endDate" 
+                       th:value="${#temporals.format(report.endDate, 'yyyy-MM-dd')}">
+                <button class="btn btn-primary" onclick="updatePeriod()">Appliquer</button>
+            </div>
+        </div>
+
+        <!-- Performance Overview -->
+        <div class="row">
+            <!-- Employee Ranking Chart -->
+            <div class="col-md-8 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Classement par chiffre d'affaires</h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="employeeRankingChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Performance Metrics -->
+            <div class="col-md-4 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Moyennes de l'équipe</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="text-muted">CA moyen par employé</label>
+                            <h3>$<span th:with="avgRevenue=${report.employeePerformance.![totalRevenue].sum() / #lists.size(report.employeePerformance)}"
+                                     th:text="${#numbers.formatDecimal(avgRevenue, 0, 'COMMA', 2, 'POINT')}">0.00</span></h3>
+                        </div>
+                        <div class="mb-3">
+                            <label class="text-muted">Commandes moyennes par employé</label>
+                            <h3 th:with="avgOrders=${report.employeePerformance.![ordersProcessed].sum() / #lists.size(report.employeePerformance)}"
+                                th:text="${#numbers.formatInteger(avgOrders, 0, 'COMMA')}">0</h3>
+                        </div>
+                        <div class="mb-3">
+                            <label class="text-muted">Panier moyen global</label>
+                            <h3>$<span th:with="totalRevenue=${report.employeePerformance.![totalRevenue].sum()},totalOrders=${report.employeePerformance.![ordersProcessed].sum()}"
+                                     th:text="${#numbers.formatDecimal(totalRevenue / totalOrders, 0, 'COMMA', 2, 'POINT')}">0.00</span></h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailed Performance Table -->
+        <div class="row">
+            <div class="col-12 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Détail des performances</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Employé</th>
+                                        <th>Commandes traitées</th>
+                                        <th>CA total</th>
+                                        <th>Panier moyen</th>
+                                        <th>Articles par commande</th>
+                                        <th>Performance relative</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:each="emp : ${report.employeePerformance}">
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <div class="me-2">
+                                                    <i class="bi bi-person-circle fs-4"></i>
+                                                </div>
+                                                <div>
+                                                    <div th:text="${emp.employee.firstName + ' ' + emp.employee.lastName}">Nom Prénom</div>
+                                                    <small class="text-muted" th:text="${emp.employee.role}">Rôle</small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span th:text="${emp.ordersProcessed}">0</span>
+                                            <small class="text-muted">commandes</small>
+                                        </td>
+                                        <td>
+                                            <div>$<span th:text="${#numbers.formatDecimal(emp.totalRevenue, 0, 'COMMA', 2, 'POINT')}">0.00</span></div>
+                                            <small class="text-muted" 
+                                                   th:with="totalRevenue=${report.employeePerformance.![totalRevenue].sum()}"
+                                                   th:text="${#numbers.formatDecimal((emp.totalRevenue / totalRevenue) * 100, 1, 1)} + '% du total'">0.0%</small>
+                                        </td>
+                                        <td>
+                                            <div>$<span th:text="${#numbers.formatDecimal(emp.averageOrderValue, 0, 'COMMA', 2, 'POINT')}">0.00</span></div>
+                                            <small th:with="avgOrderValue=${report.employeePerformance.![averageOrderValue].average()},
+                                                          diff=${((emp.averageOrderValue - avgOrderValue) / avgOrderValue) * 100}"
+                                                   th:class="${diff >= 0 ? 'text-success' : 'text-danger'}"
+                                                   th:text="${diff >= 0 ? '+' : ''} + ${#numbers.formatDecimal(diff, 1, 1)} + '% vs moyenne'">0.0%</small>
+                                        </td>
+                                        <td>
+                                            <div th:text="${#numbers.formatDecimal(emp.itemsPerOrder, 1, 1)}">0.0</div>
+                                            <small th:with="avgItems=${report.employeePerformance.![itemsPerOrder].average()},
+                                                          diff=${((emp.itemsPerOrder - avgItems) / avgItems) * 100}"
+                                                   th:class="${diff >= 0 ? 'text-success' : 'text-danger'}"
+                                                   th:text="${diff >= 0 ? '+' : ''} + ${#numbers.formatDecimal(diff, 1, 1)} + '% vs moyenne'">0.0%</small>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <div class="progress flex-grow-1 me-2" style="height: 6px;">
+                                                    <div class="progress-bar" role="progressbar" 
+                                                         th:with="maxRevenue=${report.employeePerformance.![totalRevenue].max()}"
+                                                         th:style="'width: ' + ${(emp.totalRevenue / maxRevenue) * 100} + '%'"
+                                                         th:aria-valuenow="${(emp.totalRevenue / maxRevenue) * 100}" 
+                                                         aria-valuemin="0" aria-valuemax="100"></div>
+                                                </div>
+                                                <span th:with="maxRevenue=${report.employeePerformance.![totalRevenue].max()}"
+                                                      th:text="${#numbers.formatDecimal((emp.totalRevenue / maxRevenue) * 100, 1, 1)} + '%'">0.0%</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script th:inline="javascript">
+        // Update period function
+        function updatePeriod() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            window.location.href = `/reports/employees?startDate=${startDate}&endDate=${endDate}`;
+        }
+
+        // Employee ranking chart
+        const employeeData = /*[[${report.employeePerformance}]]*/ [];
+        new Chart(document.getElementById('employeeRankingChart'), {
+            type: 'bar',
+            data: {
+                labels: employeeData.map(emp => emp.employee.firstName + ' ' + emp.employee.lastName),
+                datasets: [{
+                    label: 'Chiffre d\'affaires',
+                    data: employeeData.map(emp => emp.totalRevenue),
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    borderColor: 'rgb(75, 192, 192)',
+                    borderWidth: 1
+                }, {
+                    label: 'Panier moyen',
+                    data: employeeData.map(emp => emp.averageOrderValue),
+                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                    borderColor: 'rgb(255, 99, 132)',
+                    borderWidth: 1,
+                    type: 'line',
+                    yAxisID: 'average'
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: value => '$' + value.toFixed(2)
+                        }
+                    },
+                    average: {
+                        position: 'right',
+                        beginAtZero: true,
+                        ticks: {
+                            callback: value => '$' + value.toFixed(2)
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: context => {
+                                const label = context.dataset.label;
+                                const value = context.raw;
+                                return `${label}: $${value.toFixed(2)}`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

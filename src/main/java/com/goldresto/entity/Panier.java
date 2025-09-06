@@ -72,6 +72,10 @@ public class Panier {
     @Column(nullable = false)
     private BigDecimal total = BigDecimal.ZERO;
 
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "user_id")
+    private User user;
+
     // Getters and Setters
     public Long getId() {
         return id;
@@ -131,6 +135,14 @@ public class Panier {
 
     public void setTotal(BigDecimal total) {
         this.total = total;
+    }
+
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
     }
 
 

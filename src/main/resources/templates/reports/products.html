@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Analyse des produits - Gold Resto</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    <link href="/css/main.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div th:replace="fragments/navbar :: navbar"></div>
+    
+    <div class="container-fluid mt-4 px-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>Analyse des produits</h2>
+            <div class="btn-group">
+                <a href="/reports" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Retour au tableau de bord
+                </a>
+                <input type="date" class="form-control" id="startDate" 
+                       th:value="${report != null && report.startDate != null ? #temporals.format(report.startDate, 'yyyy-MM-dd') : ''}">
+                <input type="date" class="form-control" id="endDate" 
+                       th:value="${report != null && report.endDate != null ? #temporals.format(report.endDate, 'yyyy-MM-dd') : ''}">
+                <button class="btn btn-primary" onclick="updatePeriod()">Appliquer</button>
+            </div>
+        </div>
+
+        <!-- Product Performance -->
+        <div class="row">
+            <!-- Top Products Chart -->
+            <div class="col-md-8 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Top 10 des produits par chiffre d'affaires</h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="topProductsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Product Stats -->
+            <div class="col-md-4 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Statistiques</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="text-muted">Nombre total de produits vendus</label>
+                            <h3 th:text="${report != null && report.topProducts != null ? #lists.size(report.topProducts) : 0}">0</h3>
+                        </div>
+                        <div class="mb-3">
+                            <label class="text-muted">Produits à faible performance</label>
+                            <h3 th:text="${report != null && report.lowPerformers != null ? #lists.size(report.lowPerformers) : 0}">0</h3>
+                            <small class="text-muted">Moins de 1% du CA total</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Product Tables -->
+        <div class="row">
+            <!-- Top Products Table -->
+            <div class="col-md-8 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Détail des ventes par produit</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Produit</th>
+                                        <th>Catégorie</th>
+                                        <th>Quantité</th>
+                                        <th>CA</th>
+                                        <th>% du CA total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:each="product : ${report != null && report.topProducts != null ? report.topProducts : {}}">
+                                        <td th:text="${product != null && product.product != null ? product.product.nomProduit : ''}">Produit</td>
+                                        <td th:text="${product != null && product.product != null ? product.product.categorie : ''}">Catégorie</td>
+                                        <td th:text="${product != null ? product.quantitySold : 0}">0</td>
+                                        <td>$<span th:text="${product != null && product.revenue != null ? #numbers.formatDecimal(product.revenue, 0, 'COMMA', 2, 'POINT') : '0.00'}">0.00</span></td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <div class="progress flex-grow-1 me-2" style="height: 6px;">
+                                                    <div class="progress-bar" role="progressbar" 
+                                                         th:style="${product != null && product.percentageOfTotal != null ? 'width: ' + product.percentageOfTotal + '%' : 'width: 0%'}"
+                                                         th:aria-valuenow="${product != null && product.percentageOfTotal != null ? product.percentageOfTotal : 0}" 
+                                                         aria-valuemin="0" aria-valuemax="100"></div>
+                                                </div>
+                                                <span th:text="${product != null && product.percentageOfTotal != null ? #numbers.formatDecimal(product.percentageOfTotal, 1, 1) : '0.0'} + '%'">0.0%</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Low Performers -->
+            <div class="col-md-4 mb-4">
+                <div class="card border-warning">
+                    <div class="card-header bg-warning bg-opacity-10">
+                        <h5 class="mb-0">Produits à surveiller</h5>
+                        <small class="text-muted">Produits représentant moins de 1% du CA total</small>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Produit</th>
+                                        <th>Quantité</th>
+                                        <th>CA</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:each="product : ${report != null && report.lowPerformers != null ? report.lowPerformers : {}}">
+                                        <td>
+                                            <span th:text="${product != null && product.product != null ? product.product.nomProduit : ''}">Produit</span><br>
+                                            <small class="text-muted" th:text="${product != null && product.product != null ? product.product.categorie : ''}">Catégorie</small>
+                                        </td>
+                                        <td th:text="${product != null ? product.quantitySold : 0}">0</td>
+                                        <td>$<span th:text="${product != null && product.revenue != null ? #numbers.formatDecimal(product.revenue, 0, 'COMMA', 2, 'POINT') : '0.00'}">0.00</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script th:inline="javascript">
+        // Update period function
+        function updatePeriod() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            window.location.href = `/reports/products?startDate=${startDate}&endDate=${endDate}`;
+        }
+
+        // Top products chart
+        const productData = /*[[${report != null && report.topProducts != null ? report.topProducts : []}]]*/ [];
+        const chartCanvas = document.getElementById('topProductsChart');
+        const ctx = chartCanvas.getContext('2d');
+
+        // Clear any existing chart
+        if (window.productChart) {
+            window.productChart.destroy();
+        }
+
+        // Create new chart only if we have data
+        if (productData && productData.length > 0) {
+            window.productChart = new Chart(chartCanvas, {
+            type: 'bar',
+            data: {
+                labels: productData.slice(0, 10).map(p => p && p.product ? p.product.nomProduit : 'Inconnu'),
+                datasets: [{
+                    label: 'Chiffre d\'affaires',
+                    data: productData.slice(0, 10).map(p => p && p.revenue ? parseFloat(p.revenue) : 0),
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    borderColor: 'rgb(75, 192, 192)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: value => '$' + value.toFixed(2)
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: context => '$' + context.raw.toFixed(2)
+                        }
+                    }
+                }
+            }
+        });
+        } else {
+            // Display no data message
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#6c757d';
+            ctx.font = '14px Arial';
+            ctx.fillText('Aucune donnée disponible pour la période sélectionnée', chartCanvas.width/2, chartCanvas.height/2);
+        }
+    </script>
+</body>
+</html>

@@ -1,128 +1,136 @@
 package com.goldresto.controller;
 
-import com.goldresto.repository.*;
-import com.goldresto.service.StockService;
+import com.goldresto.service.ReportService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.time.LocalDate;
-import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
-import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/reports")
-@PreAuthorize("hasRole('OWNER')")
+@PreAuthorize("hasAuthority('ROLE_OWNER')")
 public class ReportController {
 
     @Autowired
-    private PanierRepository panierRepository;
-
-    @Autowired
-    private ProduitRepository produitRepository;
-
-    @Autowired
-    private PaiementRepository paiementRepository;
-
-    @Autowired
-    private StockService stockService;
+    private ReportService reportService;
 
     @GetMapping
-    public String showReports(Model model) {
-        // Sales summary
-        BigDecimal totalSales = paiementRepository.findAll().stream()
-            .map(p -> p.getMontantAPayer())
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
-        
-        long totalOrders = panierRepository.count();
-        
-        // Low stock products
-        List<Map<String, Object>> lowStockProducts = produitRepository.findAll().stream()
-            .filter(p -> p.getStock() <= 10)
-            .map(p -> {
-                Map<String, Object> map = new HashMap<>();
-                map.put("name", p.getNomProduit());
-                map.put("stock", p.getStock());
-                map.put("price", p.getPrix());
-                return map;
-            })
-            .collect(Collectors.toList());
+    public String showDashboard(Model model) {
+        LocalDate today = LocalDate.now();
+        Map<String, Object> dailyReport = reportService.getDailySalesReport(today);
+        Map<String, Object> monthlyReport = reportService.getPeriodSalesReport(
+            today.withDayOfMonth(1), today, "month");
+        Map<String, Object> productReport = reportService.getProductSalesReport(
+            today.minusMonths(1), today);
+        Map<String, Object> categoryReport = reportService.getCategorySalesReport(
+            today.minusMonths(1), today);
 
-        // Today's sales
-        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
-        List<Map<String, Object>> todaySales = paiementRepository.findByDateCreationAfter(startOfDay)
-            .stream()
-            .map(p -> {
-                Map<String, Object> map = new HashMap<>();
-                map.put("time", p.getDateCreation());
-                map.put("amount", p.getMontantAPayer());
-                map.put("method", p.getCashRecu() != null ? "CASH" : "CARD");
-                return map;
-            })
-            .collect(Collectors.toList());
-
-        model.addAttribute("totalSales", totalSales);
-        model.addAttribute("totalOrders", totalOrders);
-        model.addAttribute("lowStockProducts", lowStockProducts);
-        model.addAttribute("todaySales", todaySales);
+        model.addAttribute("dailyReport", dailyReport);
+        model.addAttribute("monthlyReport", monthlyReport);
+        model.addAttribute("topProducts", productReport.get("topProducts"));
+        model.addAttribute("categoryPerformance", categoryReport.get("categoryPerformance"));
         
         return "reports/dashboard";
     }
 
-    @GetMapping("/sales")
-    public String showSalesReport(
-            @RequestParam(required = false) LocalDate startDate,
-            @RequestParam(required = false) LocalDate endDate,
+    @GetMapping("/daily")
+    public String showDailyReport(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            Model model) {
+        if (date == null) date = LocalDate.now();
+        model.addAttribute("report", reportService.getDailySalesReport(date));
+        return "reports/daily";
+    }
+
+    @GetMapping("/period")
+    public String showPeriodReport(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(defaultValue = "day") String periodType,
+            Model model) {
+        
+        if (startDate == null) startDate = LocalDate.now().minusMonths(1);
+        if (endDate == null) endDate = LocalDate.now();
+        
+        // Ensure endDate is not before startDate
+        if (endDate.isBefore(startDate)) {
+            LocalDate temp = startDate;
+            startDate = endDate;
+            endDate = temp;
+        }
+
+        // Validate periodType
+        if (!periodType.matches("^(day|week|month|year)$")) {
+            periodType = "day";
+        }
+
+        Map<String, Object> report = reportService.getPeriodSalesReport(startDate, endDate, periodType);
+        model.addAttribute("report", report);
+        model.addAttribute("periodType", periodType);
+        return "reports/period";
+    }
+
+    @GetMapping("/products")
+    public String showProductReport(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             Model model) {
         
         if (startDate == null) startDate = LocalDate.now().minusMonths(1);
         if (endDate == null) endDate = LocalDate.now();
 
-        List<Map<String, Object>> salesData = paiementRepository
-            .findByDateCreationBetween(startDate.atStartOfDay(), endDate.plusDays(1).atStartOfDay())
-            .stream()
-            .map(p -> {
-                Map<String, Object> map = new HashMap<>();
-                map.put("date", p.getDateCreation());
-                map.put("amount", p.getMontantAPayer());
-                map.put("method", p.getCashRecu() != null ? "CASH" : "CARD");
-                return map;
-            })
-            .collect(Collectors.toList());
+        // Ensure endDate is not before startDate
+        if (endDate.isBefore(startDate)) {
+            LocalDate temp = startDate;
+            startDate = endDate;
+            endDate = temp;
+        }
 
-        model.addAttribute("startDate", startDate);
-        model.addAttribute("endDate", endDate);
-        model.addAttribute("salesData", salesData);
-        
-        return "reports/sales";
+        Map<String, Object> report = reportService.getProductSalesReport(startDate, endDate);
+        model.addAttribute("report", report);
+        return "reports/products";
     }
 
-    @GetMapping("/stock")
-    public String showStockReport(Model model) {
-        List<Map<String, Object>> stockData = produitRepository.findAll().stream()
-            .map(p -> {
-                Map<String, Object> map = new HashMap<>();
-                map.put(
-                "name", p.getNomProduit());
-                map.put("stock", p.getStock());
-                map.put("price", p.getPrix());
-                map.put("value", BigDecimal.valueOf(p.getStock()).multiply(p.getPrix()));
-                return map;
-            })
-            .collect(Collectors.toList());
-
-        double totalStockValue = stockData.stream()
-            .mapToDouble(m -> (Double) m.get("value"))
-            .sum();
-
-        model.addAttribute("stockData", stockData);
-        model.addAttribute("totalStockValue", totalStockValue);
+    @GetMapping("/categories")
+    public String showCategoryReport(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            Model model) {
         
-        return "reports/stock";
+        if (startDate == null) startDate = LocalDate.now().minusMonths(1);
+        if (endDate == null) endDate = LocalDate.now();
+
+        model.addAttribute("report", reportService.getCategorySalesReport(startDate, endDate));
+        return "reports/categories";
+    }
+
+    @GetMapping("/employees")
+    public String showEmployeeReport(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            Model model) {
+        
+        if (startDate == null) startDate = LocalDate.now().minusMonths(1);
+        if (endDate == null) endDate = LocalDate.now();
+
+        model.addAttribute("report", reportService.getEmployeePerformanceReport(startDate, endDate));
+        return "reports/employees";
+    }
+
+    // API endpoints for chart data
+    @GetMapping("/api/trends")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> getTrends(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam String periodType) {
+        
+        Map<String, Object> report = reportService.getPeriodSalesReport(startDate, endDate, periodType);
+        return ResponseEntity.ok(report);
     }
 }
