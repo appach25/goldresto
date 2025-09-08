@@ -3,6 +3,8 @@ package com.goldresto.entity;
 import jakarta.persistence.*;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.List;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "users")
@@ -29,6 +31,10 @@ public class User {
     private Set<Role> roles = new HashSet<>();
 
     private boolean enabled = true;
+
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<Paiement> payments;
 
     // Getters and Setters
     public Long getId() {
@@ -77,5 +83,26 @@ public class User {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public List<Paiement> getPayments() {
+        return payments;
+    }
+
+    public void setPayments(List<Paiement> payments) {
+        this.payments = payments;
+    }
+
+    public String getRole() {
+        if (roles != null && !roles.isEmpty()) {
+            String roleName = roles.iterator().next().getName();
+            switch (roleName) {
+                case Role.ROLE_OWNER: return "Propriétaire";
+                case Role.ROLE_ADMIN: return "Administrateur";
+                case Role.ROLE_EMPLOYEE: return "Employé";
+                default: return roleName;
+            }
+        }
+        return "";
     }
 }

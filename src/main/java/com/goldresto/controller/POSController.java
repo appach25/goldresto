@@ -242,21 +242,24 @@ public class POSController {
         Panier panier = panierRepository.findByIdWithLignes(panierId)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid panier ID"));
         
+        // Save the panier with current user before linking to payment
+        panier = panierService.savePanier(panier);
+        
         paiement.setPanier(panier);
+        paiement.setMontantAPayer(panier.getTotal());
+        if (paiement.getCashRecu() != null) {
+            paiement.setMonnaie(paiement.getCashRecu().subtract(panier.getTotal()));
+        }
         Paiement savedPaiement = paiementRepository.save(paiement);
 
         // Persist Journal after payment
         Journal journal = new Journal();
         journal.setPanierId(panier.getId()); // Set the original Panier ID
         journal.setNumeroTable(panier.getNumeroTable());
-        journal.setTotal(panier.getTotal() != null ? panier.getTotal().doubleValue() : null);
+        journal.setTotal(paiement.getMontantAPayer() != null ? paiement.getMontantAPayer().doubleValue() : null);
         journal.setDatePaiement(java.time.LocalDateTime.now());
         journal.setMontantRecu(paiement.getCashRecu() != null ? paiement.getCashRecu().doubleValue() : null);
-        journal.setMonnaieRendue(
-            (paiement.getCashRecu() != null && panier.getTotal() != null)
-                ? paiement.getCashRecu().subtract(panier.getTotal()).doubleValue()
-                : null
-        );
+        journal.setMonnaieRendue(paiement.getMonnaie() != null ? paiement.getMonnaie().doubleValue() : null);
         if (panier.getLignesProduits() != null) {
             journal.setLignesProduits(
                 panier.getLignesProduits().stream().map(ligne -> {

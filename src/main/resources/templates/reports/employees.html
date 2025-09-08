@@ -6,7 +6,6 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
     <link href="/css/main.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div th:replace="fragments/navbar :: navbar"></div>
@@ -34,12 +33,15 @@
                         <h5 class="mb-0">Ventes par employé</h5>
                     </div>
                     <div class="card-body">
-                        <div class="table-responsive">
+                        <div th:if="${#lists.isEmpty(report.employeePerformance)}" class="text-center py-5">
+                            <i class="bi bi-info-circle fs-1 text-muted"></i>
+                            <p class="mt-3 text-muted">Aucune donnée disponible pour la période sélectionnée</p>
+                        </div>
+                        <div th:unless="${#lists.isEmpty(report.employeePerformance)}" class="table-responsive">
                             <table class="table table-hover">
                                 <thead>
                                     <tr>
                                         <th>Employé</th>
-                                        <th>Nombre de commandes</th>
                                         <th>Chiffre d'affaires</th>
                                         <th>Performance</th>
                                     </tr>
@@ -58,26 +60,22 @@
                                             </div>
                                         </td>
                                         <td>
-                                            <span th:text="${emp.ordersProcessed}">0</span>
-                                            <small class="text-muted">commandes</small>
-                                        </td>
-                                        <td>
                                             <div>$<span th:text="${#numbers.formatDecimal(emp.totalRevenue, 0, 'COMMA', 2, 'POINT')}">0.00</span></div>
                                             <small class="text-muted" 
                                                    th:with="totalRevenue=${report.employeePerformance.![totalRevenue].sum()}"
-                                                   th:text="${#numbers.formatDecimal((emp.totalRevenue / totalRevenue) * 100, 1, 1)} + '% du total'">0.0%</small>
+                                                   th:text="${totalRevenue > 0 ? #numbers.formatDecimal((emp.totalRevenue / totalRevenue) * 100, 1, 1) : 0} + '% du total'">0.0%</small>
                                         </td>
                                         <td>
                                             <div class="d-flex align-items-center">
                                                 <div class="progress flex-grow-1 me-2" style="height: 6px;">
                                                     <div class="progress-bar" role="progressbar" 
                                                          th:with="maxRevenue=${report.employeePerformance.![totalRevenue].max()}"
-                                                         th:style="'width: ' + ${(emp.totalRevenue / maxRevenue) * 100} + '%'"
-                                                         th:aria-valuenow="${(emp.totalRevenue / maxRevenue) * 100}" 
+                                                         th:style="'width: ' + ${maxRevenue > 0 ? (emp.totalRevenue / maxRevenue) * 100 : 0} + '%'"
+                                                         th:aria-valuenow="${maxRevenue > 0 ? (emp.totalRevenue / maxRevenue) * 100 : 0}" 
                                                          aria-valuemin="0" aria-valuemax="100"></div>
                                                 </div>
                                                 <span th:with="maxRevenue=${report.employeePerformance.![totalRevenue].max()}"
-                                                      th:text="${#numbers.formatDecimal((emp.totalRevenue / maxRevenue) * 100, 1, 1)} + '%'">0.0%</span>
+                                                      th:text="${maxRevenue > 0 ? #numbers.formatDecimal((emp.totalRevenue / maxRevenue) * 100, 1, 1) : 0} + '%'">0.0%</span>
                                             </div>
                                         </td>
                                     </tr>
@@ -91,75 +89,25 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script th:inline="javascript">
-        // Update period function
+    <script>
         function updatePeriod() {
             const startDate = document.getElementById('startDate').value;
             const endDate = document.getElementById('endDate').value;
+            
+            if (!startDate || !endDate) {
+                alert('Veuillez sélectionner une date de début et une date de fin');
+                return;
+            }
+            
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            if (end < start) {
+                alert('La date de fin doit être postérieure à la date de début');
+                return;
+            }
+            
             window.location.href = `/reports/employees?startDate=${startDate}&endDate=${endDate}`;
         }
-
-        // Employee ranking chart
-        const employeeData = /*[[${report.employeePerformance}]]*/ [];
-        new Chart(document.getElementById('employeeRankingChart'), {
-            type: 'bar',
-            data: {
-                labels: employeeData.map(emp => emp && emp.employee ? emp.employee.firstName + ' ' + emp.employee.lastName : 'Unknown'),
-                datasets: [{
-                    label: 'Chiffre d\'affaires',
-                    data: employeeData.map(emp => emp && emp.totalRevenue ? emp.totalRevenue : 0),
-                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                    borderColor: 'rgb(75, 192, 192)',
-                    borderWidth: 1
-                }, {
-                    label: 'Panier moyen',
-                    data: employeeData.map(emp => emp && emp.averageOrderValue ? emp.averageOrderValue : 0),
-                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                    borderColor: 'rgb(255, 99, 132)',
-                    borderWidth: 1,
-                    type: 'line',
-                    yAxisID: 'average'
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            callback: value => value !== null ? new Intl.NumberFormat('en-US', {
-                                style: 'currency',
-                                currency: 'USD'
-                            }).format(value) : ''
-                        }
-                    },
-                    average: {
-                        position: 'right',
-                        beginAtZero: true,
-                        ticks: {
-                            callback: value => value !== null ? new Intl.NumberFormat('en-US', {
-                                style: 'currency',
-                                currency: 'USD'
-                            }).format(value) : ''
-                        }
-                    }
-                },
-                plugins: {
-                    tooltip: {
-                        callbacks: {
-                            label: context => {
-                                const label = context.dataset.label;
-                                const value = context.raw;
-                                return `${label}: ${new Intl.NumberFormat('en-US', {
-                                    style: 'currency',
-                                    currency: 'USD'
-                                }).format(value)}`;
-                            }
-                        }
-                    }
-                }
-            }
-        });
     </script>
 </body>
 </html>

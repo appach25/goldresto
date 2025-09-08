@@ -11,7 +11,9 @@ import java.util.ArrayList;
 import java.util.List;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @Entity
 @JsonInclude(JsonInclude.Include.ALWAYS)
@@ -67,6 +69,7 @@ public class Panier {
     private PanierState state = PanierState.EN_COURS;
 
     @OneToOne(mappedBy = "panier")
+    @JsonBackReference
     private Paiement paiement;
 
     @Column(nullable = false)
@@ -74,6 +77,7 @@ public class Panier {
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "user_id")
+    @JsonIgnoreProperties({"password", "roles"})
     private User user;
 
     // Getters and Setters

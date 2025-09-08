@@ -302,67 +302,63 @@ public class ReportService {
     }
 
     public Map<String, Object> getEmployeePerformanceReport(LocalDate startDate, LocalDate endDate) {
-        // Initialize with default dates if not provided
-        if (startDate == null || endDate == null) {
-            startDate = LocalDate.now().minusMonths(1);
-            endDate = LocalDate.now();
-        }
+        try {
+            // Initialize with default dates if not provided
+            if (startDate == null || endDate == null) {
+                startDate = LocalDate.now().minusMonths(1);
+                endDate = LocalDate.now();
+            }
 
-        // Get orders for the period
-        List<Panier> paniers = panierRepository.findByDateBetween(
-            startDate.atStartOfDay(),
-            endDate.plusDays(1).atStartOfDay()
-        );
+            // Get orders for the period
+            List<Panier> paniers = panierRepository.findByDateBetween(
+                startDate.atStartOfDay(),
+                endDate.plusDays(1).atStartOfDay()
+            );
 
-        // Initialize empty report if no orders
-        if (paniers == null || paniers.isEmpty()) {
+            // Initialize empty report
             Map<String, Object> report = new HashMap<>();
             report.put("startDate", startDate);
             report.put("endDate", endDate);
             report.put("employeePerformance", new ArrayList<>());
-            return report;
-        }
 
-        // Filter for only paid orders
-        paniers = paniers.stream()
-            .filter(p -> p != null && p.getState() == PanierState.PAYER)
-            .collect(Collectors.toList());
-
-        // Group by employee
-        Map<User, EmployeeMetrics> employeeMetrics = new HashMap<>();
-        
-        for (Panier panier : paniers) {
-            User employee = panier.getUser();
-            if (employee == null) {
-                employee = new User();
-                employee.setId(-1L);
-                employee.setUsername("unknown");
-                employee.setFullName("Unknown Employee");
-                employee.setPassword("");
+            // Return empty report if no orders
+            if (paniers == null || paniers.isEmpty()) {
+                return report;
             }
-            
-            employeeMetrics.computeIfAbsent(employee, k -> new EmployeeMetrics())
-                .addOrder(panier.getTotal());
+
+            // Filter for only paid orders
+            Map<User, BigDecimal> employeeSales = paniers.stream()
+                .filter(p -> p != null && p.getState() == PanierState.PAYER && p.getUser() != null)
+                .collect(Collectors.groupingBy(
+                    Panier::getUser,
+                    Collectors.mapping(
+                        p -> p.getTotal() != null ? p.getTotal() : BigDecimal.ZERO,
+                        Collectors.reducing(BigDecimal.ZERO, BigDecimal::add)
+                    )
+                ));
+
+            // Convert to list format
+            List<Map<String, Object>> employeePerformance = employeeSales.entrySet().stream()
+                .map(entry -> {
+                    Map<String, Object> employeeMap = new HashMap<>();
+                    employeeMap.put("employee", entry.getKey());
+                    employeeMap.put("totalRevenue", entry.getValue());
+                    return employeeMap;
+                })
+                .sorted((m1, m2) -> ((BigDecimal)m2.get("totalRevenue")).compareTo((BigDecimal)m1.get("totalRevenue")))
+                .collect(Collectors.toList());
+
+            report.put("employeePerformance", employeePerformance);
+            return report;
+
+        } catch (Exception e) {
+            // Return empty report in case of any error
+            Map<String, Object> errorReport = new HashMap<>();
+            errorReport.put("startDate", startDate);
+            errorReport.put("endDate", endDate);
+            errorReport.put("employeePerformance", new ArrayList<>());
+            return errorReport;
         }
-
-        // Convert to list and sort by revenue
-        List<Map<String, Object>> employeePerformance = employeeMetrics.entrySet().stream()
-            .map(entry -> {
-                Map<String, Object> employeeMap = new HashMap<>();
-                employeeMap.put("employee", entry.getKey());
-                employeeMap.put("ordersProcessed", entry.getValue().getOrdersProcessed());
-                employeeMap.put("totalRevenue", entry.getValue().getTotalRevenue());
-                return employeeMap;
-            })
-            .sorted((m1, m2) -> ((BigDecimal)m2.get("totalRevenue")).compareTo((BigDecimal)m1.get("totalRevenue")))
-            .collect(Collectors.toList());
-
-        // Build final report
-        Map<String, Object> result = new HashMap<>();
-        result.put("startDate", startDate);
-        result.put("endDate", endDate);
-        result.put("employeePerformance", employeePerformance);
-        return result;
     }
 
     // Helper classes for metrics
@@ -529,22 +525,34 @@ public class ReportService {
     }
 
     private LocalDate getPreviousPeriodStart(LocalDate date, String periodType) {
-        return switch (periodType.toLowerCase()) {
-            case "day" -> date.minusDays(1);
-            case "week" -> date.minusWeeks(1);
-            case "month" -> date.minusMonths(1);
-            case "year" -> date.minusYears(1);
-            default -> date.minusDays(1);
-        };
+        if (periodType == null) {
+            return date.minusDays(1);
+        }
+        switch (periodType.toLowerCase()) {
+            case "week":
+                return date.minusWeeks(1);
+            case "month":
+                return date.minusMonths(1);
+            case "year":
+                return date.minusYears(1);
+            default:
+                return date.minusDays(1);
+        }
     }
 
     private LocalDate getPreviousPeriodEnd(LocalDate date, String periodType) {
-        return switch (periodType.toLowerCase()) {
-            case "day" -> date.minusDays(1);
-            case "week" -> date.minusWeeks(1);
-            case "month" -> date.minusMonths(1);
-            case "year" -> date.minusYears(1);
-            default -> date.minusDays(1);
-        };
+        if (periodType == null) {
+            return date.minusDays(1);
+        }
+        switch (periodType.toLowerCase()) {
+            case "week":
+                return date.minusWeeks(1);
+            case "month":
+                return date.minusMonths(1);
+            case "year":
+                return date.minusYears(1);
+            default:
+                return date.minusDays(1);
+        }
     }
 }

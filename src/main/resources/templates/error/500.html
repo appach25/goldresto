@@ -17,6 +17,7 @@
                     <i class="bi bi-x-circle-fill display-1"></i>
                     <h2 class="mt-3">Erreur serveur</h2>
                     <p class="lead">Une erreur interne s'est produite sur le serveur.</p>
+                    <p th:if="${error}" th:text="${error}" class="text-danger"></p>
                     <p>Notre équipe technique a été notifiée. Veuillez réessayer plus tard.</p>
                     <hr>
                     <div class="d-flex justify-content-center gap-2">
