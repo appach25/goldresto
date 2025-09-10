@@ -98,7 +98,10 @@
                     <div class="card-body">
                         <h5 class="card-title">Total</h5>
                         <h3 class="card-text mb-4" id="cartTotal">$0.00</h3>
-                        <button class="btn btn-primary w-100" onclick="validatePanier()">Valider la commande</button>
+                        <button id="validateButton" class="btn btn-primary w-100" onclick="validatePanier()">
+                            <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                            <span class="button-text">Valider la commande</span>
+                        </button>
                     </div>
                 </div>
 
@@ -285,115 +288,132 @@
             } catch (error) {
                 alert('Erreur lors du chargement du panier');
                 console.error(error);
+            } finally {
+                // Re-enable button and restore original state
+                validateButton.disabled = false;
+                spinner.classList.add('d-none');
+                buttonText.textContent = 'Valider la commande';
             }
         }
 
         async function validatePanier() {
-            const tableNumber = document.getElementById('tableNumber').value;
-            if (!tableNumber) {
-                alert('Veuillez entrer un numéro de table');
+            const validateButton = document.getElementById('validateButton');
+            const spinner = validateButton.querySelector('.spinner-border');
+            const buttonText = validateButton.querySelector('.button-text');
+
+            // Prevent double submission
+            if (validateButton.disabled) {
                 return;
             }
 
-            if (!currentPanier || !currentPanier.id) {
-                const isTableValid = await validateTableNumber(tableNumber);
-                if (!isTableValid) {
-                    alert('Cette table est déjà occupée');
+            try {
+                // Disable button and show loading state
+                validateButton.disabled = true;
+                spinner.classList.remove('d-none');
+                buttonText.textContent = 'Validation en cours...';
+
+                if (cartItems.size === 0) {
+                    alert('Ajouter produit SVP');
                     return;
                 }
-            }
 
-            // If editing or adding product to existing panier, skip table number validation
-            if (currentPanier && currentPanier.id) {
-                const promises = [];
-                for (const [produitId, item] of cartItems) {
-                    try {
-                        const frontendTotal = parseFloat(document.getElementById('cartTotal').textContent.replace('$', ''));
-                        const response = await fetch(`/pos/panier/${currentPanier.id}/addProduct?produitId=${produitId}&quantite=${item.quantity}&frontendTotal=${frontendTotal}`, {
-                            method: 'POST'
-                        });
-                        
-                        if (!response.ok) {
-                            const errorText = await response.text();
-                            alert(errorText);
+                const tableNumber = document.getElementById('tableNumber').value;
+                if (!tableNumber) {
+                    alert('Veuillez entrer un numéro de table');
+                    return;
+                }
+
+                // If editing or adding product to existing panier, skip table number validation
+                if (currentPanier && currentPanier.id) {
+                    const promises = [];
+                    for (const [produitId, item] of cartItems) {
+                        try {
+                            const frontendTotal = parseFloat(document.getElementById('cartTotal').textContent.replace('$', ''));
+                            const response = await fetch(`/pos/panier/${currentPanier.id}/addProduct?produitId=${produitId}&quantite=${item.quantity}&frontendTotal=${frontendTotal}`, {
+                                method: 'POST'
+                            });
+                            
+                            if (!response.ok) {
+                                const errorText = await response.text();
+                                alert(errorText);
+                                return;
+                            }
+                            
+                            // Update stock display after successful addition
+                            const stockSpan = document.querySelector(`#produit_${produitId} .stock-count`);
+                            if (stockSpan) {
+                                const newStock = parseInt(stockSpan.textContent) - item.quantity;
+                                stockSpan.textContent = newStock;
+                                const smallElement = stockSpan.closest('small');
+                                if (newStock <= 10) {
+                                    smallElement.classList.remove('text-muted');
+                                    smallElement.classList.add('text-danger');
+                                }
+                            }
+                        } catch (error) {
+                            alert('Erreur lors de l\'ajout du produit: ' + error.message);
                             return;
                         }
-                        
-                        // Update stock display after successful addition
-                        const stockSpan = document.querySelector(`#produit_${produitId} .stock-count`);
-                        if (stockSpan) {
-                            const newStock = parseInt(stockSpan.textContent) - item.quantity;
-                            stockSpan.textContent = newStock;
-                            const smallElement = stockSpan.closest('small');
-                            if (newStock <= 10) {
-                                smallElement.classList.remove('text-muted');
-                                smallElement.classList.add('text-danger');
-                            }
-                        }
-                    } catch (error) {
-                        alert('Erreur lors de l\'ajout du produit: ' + error.message);
-                        return;
                     }
+
+                    await Promise.all(promises);
                 }
 
-                await Promise.all(promises);
-
-                // Send frontend total to backend when validating
-                try {
-                    const frontendTotal = parseFloat(document.getElementById('cartTotal').textContent.replace('$', ''));
-                    await fetch(`/pos/panier/${currentPanier.id}/validate?total=${frontendTotal}`, {
-                        method: 'POST'
-                    });
-                } catch (error) {
-                    alert('Erreur lors de la validation du panier');
-                    return;
-                }
-
-                clearInterface();
-                alert('Panier modifié avec succès !');
-                return;
-            }
-
-            // Create a new panier with products
-            const products = [];
-            let total = new Decimal(0);
-            
-            cartItems.forEach((item, produitId) => {
-                const prixUnitaire = new Decimal(item.produit.prix);
-                const sousTotal = prixUnitaire.times(item.quantity);
-                total = total.plus(sousTotal);
+                // Create a new panier with products
+                const products = [];
+                let total = new Decimal(0);
                 
-                products.push({
-                    produitId: produitId,
-                    quantite: item.quantity,
-                    prixUnitaire: prixUnitaire.toNumber()
+                cartItems.forEach((item, produitId) => {
+                    const prixUnitaire = new Decimal(item.produit.prix);
+                    const sousTotal = prixUnitaire.times(item.quantity);
+                    total = total.plus(sousTotal);
+                    
+                    products.push({
+                        produitId: produitId,
+                        quantite: item.quantity,
+                        prixUnitaire: prixUnitaire.toNumber()
+                    });
                 });
-            });
 
-            const panier = {
-                numeroTable: parseInt(tableNumber),
-                state: 'EN_COURS',
-                products: products,
-                total: total.toNumber()
-            };
+                const panier = {
+                    numeroTable: parseInt(tableNumber),
+                    state: 'EN_COURS',
+                    products: products,
+                    total: total.toNumber()
+                };
 
-            fetch('/pos/panier/create', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(panier)
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Failed to create panier');
+                try {
+                    const response = await fetch('/pos/panier/create', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(panier)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Failed to create panier');
+                    }
+
+                    await response.json();
+                    clearInterface();
+                    alert('Commande validée !');
+                } catch (error) {
+                    console.error('Error creating panier:', error);
+                    alert('Erreur lors de la validation du panier');
+                } finally {
+                    validateButton.disabled = false;
+                    spinner.classList.add('d-none');
+                    buttonText.textContent = 'Valider la commande';
                 }
-                return response.json();
-            })
-            .then(() => {
-                clearInterface();
-                alert('Commande validée !');
-            });
+            } catch (error) {
+                console.error('Error validating panier:', error);
+                alert('Erreur lors de la validation du panier');
+            } finally {
+                validateButton.disabled = false;
+                spinner.classList.add('d-none');
+                buttonText.textContent = 'Valider la commande';
+            }
         }
 
         function clearInterface() {
