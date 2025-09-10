@@ -67,15 +67,16 @@
     </div>
 
     <!-- Replenish Modal -->
-    <div class="modal fade" id="replenishModal" tabindex="-1">
+    <div class="modal fade" id="replenishModal" tabindex="-1" role="dialog" aria-labelledby="replenishModalTitle">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Réapprovisionner le Stock</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <h5 class="modal-title" id="replenishModalTitle">Réapprovisionner le Stock</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
                 </div>
                 <div class="modal-body">
                     <form id="replenishForm">
+                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                         <input type="hidden" id="produitId">
                         <div class="mb-3">
                             <label class="form-label">Produit:</label>
@@ -163,12 +164,20 @@
                 return;
             }
 
+            const form = document.getElementById('replenishForm');
+            const csrfToken = form.querySelector('input[name="_csrf"]').value;
+            const params = new URLSearchParams();
+            params.append('produitId', produitId);
+            params.append('quantity', quantity);
+            params.append('reason', reason);
+
             fetch('/stock/replenish', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRF-TOKEN': csrfToken
                 },
-                body: `produitId=${produitId}&quantity=${quantity}&reason=${encodeURIComponent(reason)}`
+                body: params
             })
             .then(response => response.json())
             .then(data => {

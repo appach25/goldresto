@@ -18,6 +18,7 @@ import java.util.stream.Collectors;
 @Controller
 @RequestMapping("/stock")
 @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
+@CrossOrigin
 public class StockController {
     @Autowired
     private ProduitRepository produitRepository;
