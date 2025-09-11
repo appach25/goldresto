@@ -36,24 +36,27 @@ public class PanierService {
 
     @Transactional
     public Panier savePanier(Panier panier) throws IllegalStateException {
-        if (isTableInUse(panier.getNumeroTable())) {
+        // Only check table if this is a new panier
+        if (panier.getId() == null && isTableInUse(panier.getNumeroTable())) {
             throw new IllegalStateException("La table " + panier.getNumeroTable() + " est déjà occupée");
         }
-        // Set the current user as the owner of the panier
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        if (principal instanceof UserDetails) {
-            String username = ((UserDetails)principal).getUsername();
-            User currentUser = userRepository.findByUsername(username).orElse(null);
-            if (currentUser != null) {
-                panier.setUser(currentUser);
-            } else {
-                logger.warn("Could not find user {} for panier", username);
+
+        // Set the current user as the owner of the panier if not already set
+        if (panier.getUser() == null) {
+            Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+            if (principal instanceof UserDetails) {
+                String username = ((UserDetails)principal).getUsername();
+                User currentUser = userRepository.findByUsername(username).orElse(null);
+                if (currentUser != null) {
+                    panier.setUser(currentUser);
+                } else {
+                    logger.warn("Could not find user {} for panier", username);
+                }
             }
         }
 
-        // First save to ensure all IDs are assigned
-        Panier savedPanier = panierRepository.save(panier);
-        return savedPanier;
+        // Save the panier
+        return panierRepository.save(panier);
     }
 
     @Transactional

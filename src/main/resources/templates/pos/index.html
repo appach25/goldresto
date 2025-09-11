@@ -317,7 +317,7 @@
                 document.getElementById('tableNumber').value = panier.numeroTable;
                 cartItems.clear();
 
-                // If clearQuantities is true, do not add previous products to cartItems
+                // Only show existing products if we're not adding new products
                 if (!clearQuantities && panier.lignesProduits) {
                     panier.lignesProduits.forEach(ligne => {
                         cartItems.set(ligne.produit.id, {
@@ -332,18 +332,12 @@
                         });
                     });
                 }
-                // If clearQuantities is true, cartItems remains empty (quantities cleared)
 
                 currentPanier = panier;
                 updateCartDisplay();
             } catch (error) {
                 alert('Erreur lors du chargement du panier');
                 console.error(error);
-            } finally {
-                // Re-enable button and restore original state
-                validateButton.disabled = false;
-                spinner.classList.add('d-none');
-                buttonText.textContent = 'Valider la commande';
             }
         }
 

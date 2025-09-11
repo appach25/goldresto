@@ -182,8 +182,9 @@
             });
         }
 
+        let selectedPanierId = null;
+
         function addProduitToPanier(panierId) {
-            // Redirect to POS page with panierId as a query param for adding products only
             window.location.href = '/pos?addProduitPanierId=' + panierId;
         }
     </script>

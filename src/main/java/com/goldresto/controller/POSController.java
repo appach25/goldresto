@@ -67,28 +67,14 @@ public class POSController {
     @Transactional(readOnly = true)
     public String paniers(Model model) {
         try {
-            logger.debug("Fetching active paniers");
-            logger.debug("Fetching active paniers with products");
+            // Fetch active paniers
             List<Panier> paniers = panierRepository.findPaniersWithLignesAndProduits(PanierState.EN_COURS);
-            logger.debug("Found {} active paniers", paniers.size());
-            
-            // Log details for debugging
-            for (Panier panier : paniers) {
-                logger.debug("Panier {} has {} products", panier.getId(), panier.getLignesProduits().size());
-                for (LignedeProduit ligne : panier.getLignesProduits()) {
-                    logger.debug("  - Product: {}, Quantity: {}", 
-                        ligne.getProduit().getNomProduit(), ligne.getQuantite());
-                }
-            }
-            logger.debug("Found {} active paniers", paniers.size());
-            
-            // Initialize the collections
-            for (Panier panier : paniers) {
-                logger.debug("Initializing panier {} with {} products", 
-                    panier.getId(), panier.getLignesProduits().size());
-            }
-            
             model.addAttribute("paniers", paniers);
+            
+            // Fetch all products for the add product modal
+            List<Produit> produits = produitRepository.findAll();
+            model.addAttribute("produits", produits);
+            
             return "pos/paniers";
         } catch (Exception e) {
             logger.error("Error fetching paniers: ", e);
@@ -183,50 +169,55 @@ public class POSController {
         @RequestParam Integer quantite,
         @RequestParam(required = false) BigDecimal frontendTotal
     ) {
-        Panier panier = panierRepository.findByIdWithLignes(panierId)
-            .orElseThrow(() -> new IllegalArgumentException("Invalid panier ID"));
-        Produit produit = produitRepository.findById(produitId)
-            .orElseThrow(() -> new IllegalArgumentException("Invalid product ID"));
+        try {
+            Panier panier = panierRepository.findByIdWithLignes(panierId)
+                .orElseThrow(() -> new IllegalArgumentException("Panier non trouvé"));
+            Produit produit = produitRepository.findById(produitId)
+                .orElseThrow(() -> new IllegalArgumentException("Produit non trouvé"));
 
-        // Check if product has enough stock
-        if (produit.getStock() < quantite) {
-            return ResponseEntity.badRequest().body("Not enough stock");
+            // Check if product has enough stock
+            if (produit.getStock() < quantite) {
+                return ResponseEntity.badRequest().body("Stock insuffisant");
+            }
+
+            // Find existing ligne or create new one
+            LignedeProduit ligne = panier.getLignesProduits().stream()
+                .filter(l -> l.getProduit().getId().equals(produitId))
+                .findFirst()
+                .orElse(null);
+
+            if (ligne == null) {
+                ligne = new LignedeProduit();
+                ligne.setPanier(panier);
+                ligne.setProduit(produit);
+                ligne.setQuantite(quantite);
+                panier.getLignesProduits().add(ligne);
+            } else {
+                // Increment quantity if line exists
+                ligne.setQuantite(ligne.getQuantite() + quantite);
+            }
+
+            // Update price and recalculate sous-total
+            ligne.setPrixUnitaire(produit.getPrix());
+            ligne.calculateSousTotal();
+
+            // Decrease stock
+            stockService.checkAndDecreaseStock(produit, quantite);
+
+            // Save using service to ensure proper total calculation
+            panier = panierService.savePanier(panier);
+
+            // Recalculate and persist total after modification
+            panierService.recalculateTotal(panier.getId());
+
+            // Fetch updated panier with recalculated total
+            Panier updatedPanier = panierRepository.findByIdWithLignes(panier.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Panier non trouvé"));
+            return ResponseEntity.ok(updatedPanier);
+        } catch (Exception e) {
+            logger.error("Error adding product to panier: ", e);
+            return ResponseEntity.badRequest().body("Erreur: " + e.getMessage());
         }
-
-        // Find existing ligne or create new one
-        LignedeProduit ligne = panier.getLignesProduits().stream()
-            .filter(l -> l.getProduit().getId().equals(produitId))
-            .findFirst()
-            .orElse(null);
-
-        if (ligne == null) {
-            ligne = new LignedeProduit();
-            ligne.setPanier(panier);
-            ligne.setProduit(produit);
-            ligne.setQuantite(quantite);
-            panier.getLignesProduits().add(ligne);
-        } else {
-            // Increment quantity if line exists
-            ligne.setQuantite(ligne.getQuantite() + quantite);
-        }
-
-        // Update price and recalculate sous-total
-        ligne.setPrixUnitaire(produit.getPrix());
-        ligne.calculateSousTotal();
-
-        // Decrease stock
-        stockService.checkAndDecreaseStock(produit, quantite);
-
-        // Save using service to ensure proper total calculation
-        panier = panierService.savePanier(panier);
-
-        // Recalculate and persist total after modification
-        panierService.recalculateTotal(panier.getId());
-
-        // Fetch updated panier with recalculated total
-        Panier updatedPanier = panierRepository.findByIdWithLignes(panier.getId())
-            .orElseThrow(() -> new IllegalArgumentException("Invalid panier ID"));
-        return ResponseEntity.ok(updatedPanier);
     }
 
     // Place this method BEFORE getPanier(Long id)
