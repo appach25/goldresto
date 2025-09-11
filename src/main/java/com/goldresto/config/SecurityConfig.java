@@ -18,15 +18,16 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(csrf -> csrf
-                .ignoringRequestMatchers("/pos/**", "/api/**")
-            )
+            .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
                 // Public resources
                 .requestMatchers("/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
                 .requestMatchers("/login", "/error").permitAll()
+                .requestMatchers("/api/printer/**").permitAll()
+                .requestMatchers("/pos/panier/*/validate").permitAll()
                 
-                // POS and Sales (Employee access)
+                // POS and Sales
+                .requestMatchers("/pos/panier/*/validate").permitAll()
                 .requestMatchers("/pos/**").hasAnyAuthority("ROLE_EMPLOYEE", "ROLE_ADMIN", "ROLE_OWNER")
                 .requestMatchers("/panier/**").hasAnyAuthority("ROLE_EMPLOYEE", "ROLE_ADMIN", "ROLE_OWNER")
                 

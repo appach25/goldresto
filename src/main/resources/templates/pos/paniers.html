@@ -25,7 +25,7 @@
 <body>
     <div th:replace="fragments/navbar :: navbar"></div>
 
-    <div class="container mt-4">
+    <div class="container mt-5 pt-3">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2>Commandes en cours</h2>
             <div class="d-flex align-items-center">
@@ -74,8 +74,7 @@
                         <div class="d-grid gap-2">
                             <!-- Action buttons group -->
                             <div class="btn-group mb-2" role="group">
-                                
-                                <button class="btn btn-success"
+                                <button class="btn btn-primary"
                                         th:onclick="'addProduitToPanier(' + ${panier.id} + ')'">
                                     <i class="bi bi-plus-square me-2"></i> Ajouter
                                 </button>
@@ -129,6 +128,7 @@
     
     <script th:inline="javascript">
         let currentPanierId = null;
+
         
         // Search functionality
         document.getElementById('tableSearch').addEventListener('input', function(e) {
@@ -180,11 +180,6 @@
                 alert('Paiement effectué avec succès !');
                 location.reload();
             });
-        }
-
-        function editPanier(panierId) {
-            // Redirect to POS page, optionally with panierId as a query param
-            window.location.href = '/pos?editPanierId=' + panierId;
         }
 
         function addProduitToPanier(panierId) {

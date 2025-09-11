@@ -82,7 +82,10 @@
                 <!-- Table Number -->
                 <div class="mb-4">
                     <label for="tableNumber" class="form-label">Numéro de table</label>
-                    <input type="number" class="form-control" id="tableNumber" min="1" max="100" value="1" onchange="validateTableNumber(this.value)">
+                    <select class="form-select" id="tableNumber" onchange="validateTableNumber(this.value)">
+                        <option value="">Sélectionnez une table</option>
+                        <!-- Table numbers will be populated dynamically -->
+                    </select>
                     <div id="tableNumberFeedback" class="invalid-feedback"></div>
                 </div>
 
@@ -217,19 +220,29 @@
         }
 
         async function validateTableNumber(tableNumber) {
+            if (!tableNumber) {
+                const tableSelect = document.getElementById('tableNumber');
+                const feedback = document.getElementById('tableNumberFeedback');
+                tableSelect.classList.add('is-invalid');
+                feedback.textContent = 'Veuillez sélectionner une table';
+                return false;
+            }
+
+            // Refresh table numbers to ensure we have the latest state
+            await populateTableNumbers();
+            
             try {
-                // FIX: Use the correct endpoint as defined in your Spring controller
                 const response = await fetch(`/pos/panier/checkNumeroTable?numeroTable=${tableNumber}`);
                 const isTableInUse = await response.json();
-                const tableInput = document.getElementById('tableNumber');
+                const tableSelect = document.getElementById('tableNumber');
                 const feedback = document.getElementById('tableNumberFeedback');
                 
                 if (isTableInUse) {
-                    tableInput.classList.add('is-invalid');
+                    tableSelect.classList.add('is-invalid');
                     feedback.textContent = 'Cette table est déjà occupée';
                     return false;
                 } else {
-                    tableInput.classList.remove('is-invalid');
+                    tableSelect.classList.remove('is-invalid');
                     feedback.textContent = '';
                     return true;
                 }
@@ -245,8 +258,46 @@
             return url.searchParams.get(name);
         }
 
+        // Function to populate available tables
+        async function populateTableNumbers() {
+            const tableSelect = document.getElementById('tableNumber');
+            const currentValue = tableSelect.value;
+            tableSelect.innerHTML = '<option value="">Sélectionnez une table</option>';
+
+            // Get occupied tables
+            const occupiedTables = new Set();
+            try {
+                const response = await fetch('/pos/panier/occupiedTables');
+                if (response.ok) {
+                    const tables = await response.json();
+                    tables.forEach(table => occupiedTables.add(table));
+                }
+            } catch (error) {
+                console.error('Error fetching occupied tables:', error);
+            }
+
+            // Add table numbers 1-100, marking occupied ones as disabled
+            for (let i = 1; i <= 100; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = `Table ${i}`;
+                if (occupiedTables.has(i)) {
+                    option.disabled = true;
+                    option.textContent += ' (Occupée)';
+                }
+                tableSelect.appendChild(option);
+            }
+
+            // Restore previous selection if valid
+            if (currentValue && !occupiedTables.has(parseInt(currentValue))) {
+                tableSelect.value = currentValue;
+            }
+        }
+
         // On page load, check if editing or adding product to a panier
         window.addEventListener('DOMContentLoaded', async () => {
+            // Populate table numbers initially
+            await populateTableNumbers();
             const editPanierId = getQueryParam('editPanierId');
             const addProduitPanierId = getQueryParam('addProduitPanierId');
             if (editPanierId) {
@@ -323,40 +374,40 @@
                     return;
                 }
 
-                // If editing or adding product to existing panier, skip table number validation
+                // If editing or adding product to existing panier
                 if (currentPanier && currentPanier.id) {
-                    const promises = [];
-                    for (const [produitId, item] of cartItems) {
-                        try {
-                            const frontendTotal = parseFloat(document.getElementById('cartTotal').textContent.replace('$', ''));
-                            const response = await fetch(`/pos/panier/${currentPanier.id}/addProduct?produitId=${produitId}&quantite=${item.quantity}&frontendTotal=${frontendTotal}`, {
+                    try {
+                        const products = [];
+                        cartItems.forEach((item, produitId) => {
+                            if (!item.readonly) { // Only add new items
+                                products.push({
+                                    produitId: produitId,
+                                    quantite: item.quantity,
+                                    prixUnitaire: item.produit.prix
+                                });
+                            }
+                        });
+
+                        // Add new products one by one
+                        for (const product of products) {
+                            const response = await fetch(`/pos/panier/${currentPanier.id}/addProduct?produitId=${product.produitId}&quantite=${product.quantite}`, {
                                 method: 'POST'
                             });
                             
                             if (!response.ok) {
                                 const errorText = await response.text();
                                 alert(errorText);
-                                return;
+                                throw new Error(errorText);
                             }
-                            
-                            // Update stock display after successful addition
-                            const stockSpan = document.querySelector(`#produit_${produitId} .stock-count`);
-                            if (stockSpan) {
-                                const newStock = parseInt(stockSpan.textContent) - item.quantity;
-                                stockSpan.textContent = newStock;
-                                const smallElement = stockSpan.closest('small');
-                                if (newStock <= 10) {
-                                    smallElement.classList.remove('text-muted');
-                                    smallElement.classList.add('text-danger');
-                                }
-                            }
-                        } catch (error) {
-                            alert('Erreur lors de l\'ajout du produit: ' + error.message);
-                            return;
                         }
-                    }
 
-                    await Promise.all(promises);
+                        // Redirect back to paniers list
+                        window.location.href = '/pos/paniers';
+                        return;
+                    } catch (error) {
+                        alert('Erreur lors de l\'ajout des produits: ' + error.message);
+                        return;
+                    }
                 }
 
                 // Create a new panier with products
@@ -395,9 +446,22 @@
                         throw new Error('Failed to create panier');
                     }
 
-                    await response.json();
+                    const savedPanier = await response.json();
+                    
+                    // Print kitchen receipt
+                    const printResponse = await fetch(`/pos/panier/${savedPanier.id}/validate`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (!printResponse.ok) {
+                        throw new Error('Failed to print kitchen receipt');
+                    }
+
                     clearInterface();
-                    alert('Commande validée !');
+                    alert('Commande validée et envoyée à la cuisine !');
                 } catch (error) {
                     console.error('Error creating panier:', error);
                     alert('Erreur lors de la validation du panier');

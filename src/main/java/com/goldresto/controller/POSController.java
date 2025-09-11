@@ -7,6 +7,7 @@ import com.goldresto.entity.*;
 import com.goldresto.repository.*;
 import com.goldresto.service.StockService;
 import com.goldresto.service.PanierService;
+import com.goldresto.service.PrinterService;
 import com.goldresto.dto.PanierCreateDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,6 +50,9 @@ public class POSController {
 
     @Autowired
     private PanierService panierService;
+
+    @Autowired
+    private PrinterService printService;
 
     @GetMapping
     public String posInterface(Model model) {
@@ -98,6 +102,11 @@ public class POSController {
     @Transactional
     public ResponseEntity<?> createPanier(@RequestBody PanierCreateDTO dto) {
         try {
+            // Check if table is already in use
+            if (panierRepository.existsByNumeroTableAndState(dto.getNumeroTable(), PanierState.EN_COURS)) {
+                return ResponseEntity.badRequest().body("La table " + dto.getNumeroTable() + " est déjà occupée");
+            }
+
             logger.debug("Creating new panier with {} products", 
                 dto.getProducts() != null ? dto.getProducts().size() : 0);
             Panier panier = new Panier();
@@ -221,6 +230,16 @@ public class POSController {
     }
 
     // Place this method BEFORE getPanier(Long id)
+    @GetMapping("/panier/occupiedTables")
+    @ResponseBody
+    public ResponseEntity<?> getOccupiedTables() {
+        List<Integer> occupiedTables = panierRepository.findByState(PanierState.EN_COURS)
+            .stream()
+            .map(Panier::getNumeroTable)
+            .collect(Collectors.toList());
+        return ResponseEntity.ok(occupiedTables);
+    }
+
     @GetMapping("/panier/checkNumeroTable")
     @ResponseBody
     public ResponseEntity<?> checkNumeroTable(@RequestParam Integer numeroTable) {
@@ -311,13 +330,33 @@ public class POSController {
 
     @PostMapping("/panier/{panierId}/validate")
     @ResponseBody
+    @PreAuthorize("permitAll()")
     public ResponseEntity<?> validatePanier(
         @PathVariable Long panierId,
         @RequestParam(required = false) BigDecimal total // frontend total ignored
     ) {
         // Always recalculate total from DB, do not trust frontend
         panierService.recalculateTotal(panierId);
+        
+        // Print kitchen receipt
+        Panier panier = panierRepository.findByIdWithLignes(panierId)
+            .orElseThrow(() -> new IllegalArgumentException("Invalid panier ID"));
+        printService.printKitchenReceipt(panier);
+        
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/panier/{panierId}/print")
+    @ResponseBody
+    public ResponseEntity<?> printKitchenReceipt(@PathVariable Long panierId) {
+        try {
+            Panier panier = panierRepository.findByIdWithLignes(panierId)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid panier ID"));
+            printService.printKitchenReceipt(panier);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error printing receipt: " + e.getMessage());
+        }
     }
 
 }

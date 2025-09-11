@@ -110,16 +110,8 @@ public class ReportController {
     }
 
     @GetMapping("/employees")
-    public String showEmployeeReport(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-            Model model) {
-        
-        if (startDate == null) startDate = LocalDate.now().minusMonths(1);
-        if (endDate == null) endDate = LocalDate.now();
-
-        model.addAttribute("report", reportService.getEmployeePerformanceReport(startDate, endDate));
-        return "reports/employees";
+    public String showEmployeeReport() {
+        return "redirect:/payments/by-user";
     }
 
     // API endpoints for chart data

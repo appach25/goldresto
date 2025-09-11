@@ -1,6 +1,7 @@
 package com.goldresto.service;
 
 import com.goldresto.entity.Panier;
+import com.goldresto.entity.PanierState;
 import com.goldresto.entity.LignedeProduit;
 import com.goldresto.repository.PanierRepository;
 import com.goldresto.repository.LignedeProduitRepository;
@@ -29,7 +30,15 @@ public class PanierService {
     private UserRepository userRepository;
 
     @Transactional
-    public Panier savePanier(Panier panier) {
+    public boolean isTableInUse(Integer numeroTable) {
+        return panierRepository.existsByNumeroTableAndState(numeroTable, PanierState.EN_COURS);
+    }
+
+    @Transactional
+    public Panier savePanier(Panier panier) throws IllegalStateException {
+        if (isTableInUse(panier.getNumeroTable())) {
+            throw new IllegalStateException("La table " + panier.getNumeroTable() + " est déjà occupée");
+        }
         // Set the current user as the owner of the panier
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         if (principal instanceof UserDetails) {
