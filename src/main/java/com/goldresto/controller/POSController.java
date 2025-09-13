@@ -210,6 +210,9 @@ public class POSController {
             // Recalculate and persist total after modification
             panierService.recalculateTotal(panier.getId());
 
+            // Print the newly added product
+            printService.printAddedProduct(panier, ligne);
+
             // Fetch updated panier with recalculated total
             Panier updatedPanier = panierRepository.findByIdWithLignes(panier.getId())
                 .orElseThrow(() -> new IllegalArgumentException("Panier non trouvé"));
