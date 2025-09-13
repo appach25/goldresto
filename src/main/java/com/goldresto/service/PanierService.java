@@ -102,20 +102,50 @@ public class PanierService {
     public void recalculateTotal(Long panierId) {
         Panier panier = panierRepository.findByIdWithLignes(panierId)
             .orElseThrow(() -> new IllegalArgumentException("Invalid panier ID"));
-        // Calculate the sum of sousTotal for all LignedeProduit in this panier
-        BigDecimal total = panier.getLignesProduits().stream()
+        
+        // Calculate the sum of sousTotal for all LignedeProduit in this panier using stream
+        BigDecimal streamTotal = panier.getLignesProduits().stream()
             .map(LignedeProduit::getSousTotal)
             .filter(java.util.Objects::nonNull)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // Log the sum returned by the SQL query for comparison
+        // Get the sum from database query
         BigDecimal dbTotal = lignedeProduitRepository.sumSousTotalByPanierId(panierId);
-        logger.debug("Panier {} - Calculated total: {}, DB total: {}", panierId, total, dbTotal);
-        logger.info("Panier {} - DB total: {}", panierId, dbTotal); // This will always show in console if log level is INFO or lower
-        System.out.println("Panier " + panierId + " - DB total: " + dbTotal);
+        
+        // Handle null dbTotal from database
+        if (dbTotal == null) {
+            dbTotal = BigDecimal.ZERO;
+        }
+        
+        // Console debugging output
+        System.out.println("=== PANIER TOTAL CALCULATION DEBUG ===");
+        System.out.println("Panier ID: " + panierId);
+        System.out.println("Stream calculated total: " + streamTotal);
+        System.out.println("Database query total: " + dbTotal);
+        System.out.println("Number of lignes in panier: " + (panier.getLignesProduits() != null ? panier.getLignesProduits().size() : 0));
+        
+        // Log individual line details for debugging
+        if (panier.getLignesProduits() != null) {
+            panier.getLignesProduits().forEach(ligne -> {
+                System.out.println("  Ligne ID: " + ligne.getId() + 
+                                   ", Produit ID: " + (ligne.getProduit() != null ? ligne.getProduit().getId() : "null") +
+                                   ", Quantite: " + ligne.getQuantite() + 
+                                   ", Prix unitaire: " + ligne.getPrixUnitaire() + 
+                                   ", Sous-total: " + ligne.getSousTotal());
+            });
+        }
+        
+        // Use the database total as the source of truth (it's more reliable)
+        BigDecimal finalTotal = dbTotal;
+        System.out.println("Using final total: " + finalTotal);
+        System.out.println("=======================================");
+        
+        // Logging for application logs
+        logger.info("Panier {} - Stream total: {}, DB total: {}, Final total: {}", 
+                    panierId, streamTotal, dbTotal, finalTotal);
 
-        // Use this calculated total to update the Panier
-        panier.setTotal(total);
+        // Use the database calculated total to update the Panier
+        panier.setTotal(finalTotal);
         panierRepository.save(panier);
     }
 }

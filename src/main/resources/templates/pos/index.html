@@ -2,6 +2,8 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
+    <meta name="_csrf" th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
     <title>Gold Resto POS</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
@@ -358,50 +360,69 @@
                 buttonText.textContent = 'Validation en cours...';
 
                 if (cartItems.size === 0) {
-                    alert('Ajouter produit SVP');
-                    return;
+                    throw new Error('Ajouter produit SVP');
                 }
 
                 const tableNumber = document.getElementById('tableNumber').value;
                 if (!tableNumber) {
-                    alert('Veuillez entrer un numéro de table');
-                    return;
+                    throw new Error('Veuillez entrer un numéro de table');
                 }
+
+                // Get CSRF token once for all requests
+                const csrfToken = document.querySelector('meta[name="_csrf"]')?.getAttribute('content');
+                const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.getAttribute('content');
+
+                if (!csrfToken || !csrfHeader) {
+                    throw new Error('CSRF tokens not found');
+                }
+
+                const headers = {
+                    'Content-Type': 'application/json',
+                    [csrfHeader]: csrfToken
+                };
 
                 // If editing or adding product to existing panier
                 if (currentPanier && currentPanier.id) {
-                    try {
-                        const products = [];
-                        cartItems.forEach((item, produitId) => {
-                            if (!item.readonly) { // Only add new items
-                                products.push({
-                                    produitId: produitId,
-                                    quantite: item.quantity,
-                                    prixUnitaire: item.produit.prix
-                                });
-                            }
-                        });
-
-                        // Add new products one by one
-                        for (const product of products) {
-                            const response = await fetch(`/pos/panier/${currentPanier.id}/addProduct?produitId=${product.produitId}&quantite=${product.quantite}`, {
-                                method: 'POST'
+                    const products = [];
+                    cartItems.forEach((item, produitId) => {
+                        if (!item.readonly) { // Only add new items
+                            products.push({
+                                produitId: produitId,
+                                quantite: item.quantity,
+                                prixUnitaire: item.produit.prix
                             });
-                            
-                            if (!response.ok) {
-                                const errorText = await response.text();
-                                alert(errorText);
-                                throw new Error(errorText);
-                            }
                         }
+                    });
 
-                        // Redirect back to paniers list
-                        window.location.href = '/pos/paniers';
-                        return;
-                    } catch (error) {
-                        alert('Erreur lors de l\'ajout des produits: ' + error.message);
-                        return;
+                    // Add new products one by one
+                    for (const product of products) {
+                        const response = await fetch(`/pos/panier/${currentPanier.id}/addProduct?produitId=${product.produitId}&quantite=${product.quantite}`, {
+                            method: 'POST',
+                            headers
+                        });
+                        
+                        if (!response.ok) {
+                            const errorText = await response.text();
+                            throw new Error(errorText);
+                        }
+                        
+                        const data = await response.json();
+                        console.log('Added product:', data);
                     }
+
+                    // Print kitchen receipt for validation
+                    const validateResponse = await fetch(`/pos/panier/${currentPanier.id}/validate`, {
+                        method: 'POST',
+                        headers
+                    });
+
+                    if (!validateResponse.ok) {
+                        const errorText = await validateResponse.text();
+                        throw new Error(errorText);
+                    }
+
+                    window.location.href = '/pos/paniers';
+                    return;
                 }
 
                 // Create a new panier with products
@@ -427,46 +448,36 @@
                     total: total.toNumber()
                 };
 
-                try {
-                    const response = await fetch('/pos/panier/create', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(panier)
-                    });
+                const response = await fetch('/pos/panier/create', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(panier)
+                });
 
-                    if (!response.ok) {
-                        throw new Error('Failed to create panier');
-                    }
-
-                    const savedPanier = await response.json();
-                    
-                    // Print kitchen receipt
-                    const printResponse = await fetch(`/pos/panier/${savedPanier.id}/validate`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        }
-                    });
-
-                    if (!printResponse.ok) {
-                        throw new Error('Failed to print kitchen receipt');
-                    }
-
-                    clearInterface();
-                    alert('Commande validée et envoyée à la cuisine !');
-                } catch (error) {
-                    console.error('Error creating panier:', error);
-                    alert('Erreur lors de la validation du panier');
-                } finally {
-                    validateButton.disabled = false;
-                    spinner.classList.add('d-none');
-                    buttonText.textContent = 'Valider la commande';
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(errorText || 'Failed to create panier');
                 }
+
+                const savedPanier = await response.json();
+
+                // Print kitchen receipt
+                const printResponse = await fetch(`/pos/panier/${savedPanier.id}/validate`, {
+                    method: 'POST',
+                    headers
+                });
+
+                if (!printResponse.ok) {
+                    const errorText = await printResponse.text();
+                    throw new Error(errorText || 'Failed to print kitchen receipt');
+                }
+
+                clearInterface();
+                alert('Commande validée et envoyée à la cuisine !');
+                window.location.href = '/pos/paniers';
             } catch (error) {
-                console.error('Error validating panier:', error);
-                alert('Erreur lors de la validation du panier');
+                console.error('Error:', error);
+                alert('Erreur: ' + error.message);
             } finally {
                 validateButton.disabled = false;
                 spinner.classList.add('d-none');
@@ -477,12 +488,24 @@
         function clearInterface() {
             cartItems.clear();
             currentPanier = null;
-            document.getElementById('tableNumber').value = '1';
-            document.getElementById('cartTotal').textContent = '$0.00'; // Reset total on clear
+            document.getElementById('tableNumber').value = '';
+            document.getElementById('cartTotal').textContent = '$0.00';
             updateCartDisplay();
         }
 
+        // Initialize event listeners
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Populate table numbers initially
+            await populateTableNumbers();
+            const editPanierId = getQueryParam('editPanierId');
+            const addProduitPanierId = getQueryParam('addProduitPanierId');
+            if (editPanierId) {
+                await editPanier(editPanierId);
+            } else if (addProduitPanierId) {
+                await editPanier(addProduitPanierId, true);
+            }
+        });
+
     </script>
 </body>
-</html>
 </html>
