@@ -145,20 +145,15 @@ public class POSController {
             logger.debug("Saving panier with total: {}", panier.getTotal());
             Panier savedPanier = panierRepository.save(panier);
             
-            // Force recalculate total
-            logger.debug("Recalculating total for saved panier");
-            savedPanier.updateAllSousTotals();
-            savedPanier.recalculateTotal();
+            // Force recalculate total using service method
+            logger.debug("Recalculating total for saved panier using service");
+            panierService.recalculateTotal(savedPanier.getId());
             
-            // Log the state after recalculation
-            savedPanier.getLignesProduits().forEach(ligne -> {
-                logger.debug("Ligne after recalc - produit: {}, quantite: {}, prix: {}, sousTotal: {}",
-                    ligne.getProduit().getId(), ligne.getQuantite(), 
-                    ligne.getPrixUnitaire(), ligne.getSousTotal());
-            });
+            // Fetch the updated panier to get the correct total
+            savedPanier = panierRepository.findByIdWithLignes(savedPanier.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Invalid panier ID"));
             
-            logger.debug("Final total after recalc: {}", savedPanier.getTotal());
-            savedPanier = panierRepository.save(savedPanier);
+            logger.debug("Final total after service recalc: {}", savedPanier.getTotal());
             
             // Print kitchen receipt
             printService.printKitchenReceipt(savedPanier);
