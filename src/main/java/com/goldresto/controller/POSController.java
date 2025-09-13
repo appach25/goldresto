@@ -17,16 +17,18 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 @Controller
 @RequestMapping("/pos")
-@PreAuthorize("hasAnyRole('EMPLOYEE', 'ADMIN', 'OWNER')")
+@CrossOrigin(origins = "*")
 public class POSController {
     private static final Logger logger = LoggerFactory.getLogger(POSController.class);
 
@@ -56,10 +58,21 @@ public class POSController {
 
     @GetMapping
     public String posInterface(Model model) {
-        model.addAttribute("produits", produitRepository.findAll());
-        model.addAttribute("panier", new Panier());
-        model.addAttribute("paniersEnCours", panierRepository.findPaniersWithLignesAndProduits(PanierState.EN_COURS));
-        return "pos/index";
+        try {
+            List<Produit> produits = produitRepository.findAll();
+            List<Panier> paniersEnCours = panierRepository.findPaniersWithLignesAndProduits(PanierState.EN_COURS);
+            
+            model.addAttribute("produits", produits);
+            model.addAttribute("panier", new Panier());
+            model.addAttribute("paniersEnCours", paniersEnCours);
+            model.addAttribute("csrfToken", "dummy"); // Add dummy CSRF token for now
+            
+            return "pos/index";
+        } catch (Exception e) {
+            logger.error("Error loading POS interface: ", e);
+            model.addAttribute("error", "Une erreur est survenue lors du chargement de l'interface POS.");
+            return "error/500";
+        }
     }
 
 
@@ -116,22 +129,18 @@ public class POSController {
                     
                     lignesProduits.add(ligne);
                     
-                    // Update stock
+                    // Decrease stock
                     stockService.checkAndDecreaseStock(produit, item.getQuantite());
+                    
+                    logger.debug("Ligne before save - produit: {}, quantite: {}, prix: {}, sousTotal: {}",
+                        ligne.getProduit().getId(), ligne.getQuantite(), 
+                        ligne.getPrixUnitaire(), ligne.getSousTotal());
                 }
             }
             
-            // Set the lignesProduits list to panier
-            logger.debug("Setting {} lignesProduits to panier", lignesProduits.size());
+            // Set lignesProduits to panier
             panier.setLignesProduits(lignesProduits);
-            
-            // Log the state before saving
-            lignesProduits.forEach(ligne -> {
-                logger.debug("Ligne before save - produit: {}, quantite: {}, prix: {}, sousTotal: {}",
-                    ligne.getProduit().getId(), ligne.getQuantite(), 
-                    ligne.getPrixUnitaire(), ligne.getSousTotal());
-            });
-            
+
             // Save panier with all its lignes
             logger.debug("Saving panier with total: {}", panier.getTotal());
             Panier savedPanier = panierRepository.save(panier);
@@ -150,6 +159,9 @@ public class POSController {
             
             logger.debug("Final total after recalc: {}", savedPanier.getTotal());
             savedPanier = panierRepository.save(savedPanier);
+            
+            // Print kitchen receipt
+            printService.printKitchenReceipt(savedPanier);
             
             // Return updated panier
             return ResponseEntity.ok(savedPanier);
@@ -170,14 +182,21 @@ public class POSController {
         @RequestParam(required = false) BigDecimal frontendTotal
     ) {
         try {
+            logger.info("Adding product {} (quantity: {}) to panier {}", produitId, quantite, panierId);
+            
             Panier panier = panierRepository.findByIdWithLignes(panierId)
-                .orElseThrow(() -> new IllegalArgumentException("Panier non trouvé"));
+                .orElseThrow(() -> new IllegalArgumentException("Panier non trouvé: " + panierId));
+
+            if (!panier.getState().equals(PanierState.EN_COURS)) {
+                throw new IllegalStateException("Ce panier n'est plus modifiable");
+            }
+
             Produit produit = produitRepository.findById(produitId)
-                .orElseThrow(() -> new IllegalArgumentException("Produit non trouvé"));
+                .orElseThrow(() -> new IllegalArgumentException("Produit non trouvé: " + produitId));
 
             // Check if product has enough stock
             if (produit.getStock() < quantite) {
-                return ResponseEntity.badRequest().body("Stock insuffisant");
+                throw new IllegalStateException("Stock insuffisant pour " + produit.getNomProduit());
             }
 
             // Find existing ligne or create new one
@@ -186,7 +205,8 @@ public class POSController {
                 .findFirst()
                 .orElse(null);
 
-            if (ligne == null) {
+            boolean isNewProduct = ligne == null;
+            if (isNewProduct) {
                 ligne = new LignedeProduit();
                 ligne.setPanier(panier);
                 ligne.setProduit(produit);
@@ -210,13 +230,20 @@ public class POSController {
             // Recalculate and persist total after modification
             panierService.recalculateTotal(panier.getId());
 
+            // Print only the new/updated product
+            List<LignedeProduit> productsToPrint = new ArrayList<>();
+            productsToPrint.add(ligne);
+            printService.printKitchenReceipt(panier, productsToPrint);
+
             // Fetch updated panier with recalculated total
             Panier updatedPanier = panierRepository.findByIdWithLignes(panier.getId())
                 .orElseThrow(() -> new IllegalArgumentException("Panier non trouvé"));
+            
+            logger.info("Successfully added product {} to panier {}", produitId, panierId);
             return ResponseEntity.ok(updatedPanier);
         } catch (Exception e) {
-            logger.error("Error adding product to panier: ", e);
-            return ResponseEntity.badRequest().body("Erreur: " + e.getMessage());
+            logger.error("Error adding product to panier {}: {}", panierId, e.getMessage(), e);
+            return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
@@ -248,43 +275,67 @@ public class POSController {
 
     @PostMapping("/paiement/{panierId}")
     @ResponseBody
+    @Transactional
     public ResponseEntity<?> processPaiement(@PathVariable Long panierId, @RequestBody Paiement paiement) {
-        Panier panier = panierRepository.findByIdWithLignes(panierId)
-                .orElseThrow(() -> new IllegalArgumentException("Invalid panier ID"));
-        
-        // Save the panier with current user before linking to payment
-        panier = panierService.savePanier(panier);
-        
-        paiement.setPanier(panier);
-        paiement.setMontantAPayer(panier.getTotal());
-        if (paiement.getCashRecu() != null) {
-            paiement.setMonnaie(paiement.getCashRecu().subtract(panier.getTotal()));
-        }
-        Paiement savedPaiement = paiementRepository.save(paiement);
+        try {
+            logger.info("Processing payment for panier {}", panierId);
+            
+            Panier panier = panierRepository.findByIdWithLignes(panierId)
+                    .orElseThrow(() -> new IllegalArgumentException("Panier non trouvé: " + panierId));
+            
+            if (!panier.getState().equals(PanierState.EN_COURS)) {
+                throw new IllegalStateException("Ce panier n'est plus modifiable");
+            }
+            
+            // Save the panier with current user before linking to payment
+            panier = panierService.savePanier(panier);
+            
+            // Validate payment amount
+            if (paiement.getCashRecu() == null || paiement.getCashRecu().compareTo(panier.getTotal()) < 0) {
+                throw new IllegalArgumentException("Le montant reçu doit être supérieur ou égal au montant à payer");
+            }
 
-        // Persist Journal after payment
-        Journal journal = new Journal();
-        journal.setPanierId(panier.getId()); // Set the original Panier ID
-        journal.setNumeroTable(panier.getNumeroTable());
-        journal.setTotal(paiement.getMontantAPayer() != null ? paiement.getMontantAPayer().doubleValue() : null);
-        journal.setDatePaiement(java.time.LocalDateTime.now());
-        journal.setMontantRecu(paiement.getCashRecu() != null ? paiement.getCashRecu().doubleValue() : null);
-        journal.setMonnaieRendue(paiement.getMonnaie() != null ? paiement.getMonnaie().doubleValue() : null);
-        if (panier.getLignesProduits() != null) {
-            journal.setLignesProduits(
-                panier.getLignesProduits().stream().map(ligne -> {
-                    JournalLigne jl = new JournalLigne();
-                    jl.setNomProduit(ligne.getProduit().getNomProduit());
-                    jl.setQuantite(ligne.getQuantite());
-                    jl.setPrixUnitaire(ligne.getPrixUnitaire() != null ? ligne.getPrixUnitaire().doubleValue() : null);
-                    jl.setSousTotal(ligne.getSousTotal() != null ? ligne.getSousTotal().doubleValue() : null);
-                    return jl;
-                }).collect(java.util.stream.Collectors.toList())
-            );
-        }
-        journalRepository.save(journal);
+            // Set panier and save payment
+            paiement.setPanier(panier);
+            Paiement savedPaiement = paiementRepository.save(paiement);
 
-        return ResponseEntity.ok(savedPaiement);
+            // Create journal entry
+            Journal journal = new Journal();
+            journal.setPanierId(panier.getId());
+            journal.setNumeroTable(panier.getNumeroTable());
+            journal.setTotal(savedPaiement.getMontantAPayer() != null ? savedPaiement.getMontantAPayer().doubleValue() : null);
+            journal.setDatePaiement(java.time.LocalDateTime.now());
+            journal.setMontantRecu(savedPaiement.getCashRecu() != null ? savedPaiement.getCashRecu().doubleValue() : null);
+            journal.setMonnaieRendue(savedPaiement.getMonnaie() != null ? savedPaiement.getMonnaie().doubleValue() : null);
+
+            // Add journal lines
+            if (panier.getLignesProduits() != null) {
+                journal.setLignesProduits(
+                    panier.getLignesProduits().stream().map(ligne -> {
+                        JournalLigne jl = new JournalLigne();
+                        jl.setNomProduit(ligne.getProduit().getNomProduit());
+                        jl.setQuantite(ligne.getQuantite());
+                        jl.setPrixUnitaire(ligne.getPrixUnitaire() != null ? ligne.getPrixUnitaire().doubleValue() : null);
+                        jl.setSousTotal(ligne.getSousTotal() != null ? ligne.getSousTotal().doubleValue() : null);
+                        return jl;
+                    }).collect(java.util.stream.Collectors.toList())
+                );
+            }
+            journalRepository.save(journal);
+
+            // Print client bill
+            printService.printClientBill(panier, savedPaiement.getCashRecu(), savedPaiement.getMonnaie());
+
+            // Update panier state to PAYER and save
+            panier.setState(PanierState.PAYER);
+            panierRepository.save(panier);
+
+            logger.info("Successfully processed payment for panier {}", panierId);
+            return ResponseEntity.ok(savedPaiement);
+        } catch (Exception e) {
+            logger.error("Error processing payment: ", e);
+            return ResponseEntity.badRequest().body("Erreur: " + e.getMessage());
+        }
     }
 
     // Endpoint to clear all products from a panier (for editing)
@@ -321,20 +372,35 @@ public class POSController {
 
     @PostMapping("/panier/{panierId}/validate")
     @ResponseBody
-    @PreAuthorize("permitAll()")
     public ResponseEntity<?> validatePanier(
         @PathVariable Long panierId,
         @RequestParam(required = false) BigDecimal total // frontend total ignored
     ) {
-        // Always recalculate total from DB, do not trust frontend
-        panierService.recalculateTotal(panierId);
-        
-        // Print kitchen receipt
-        Panier panier = panierRepository.findByIdWithLignes(panierId)
-            .orElseThrow(() -> new IllegalArgumentException("Invalid panier ID"));
-        printService.printKitchenReceipt(panier);
-        
-        return ResponseEntity.ok().build();
+        try {
+            logger.info("Validating panier {}", panierId);
+            
+            // Always recalculate total from DB, do not trust frontend
+            panierService.recalculateTotal(panierId);
+            
+            // Get panier with products
+            Panier panier = panierRepository.findByIdWithLignes(panierId)
+                .orElseThrow(() -> new IllegalArgumentException("Panier non trouvé: " + panierId));
+
+            if (panier.getLignesProduits() == null || panier.getLignesProduits().isEmpty()) {
+                throw new IllegalStateException("Le panier est vide");
+            }
+            
+            // Print kitchen receipt
+            logger.info("Printing kitchen receipt for panier {} with {} products", 
+                panierId, panier.getLignesProduits().size());
+            printService.printKitchenReceipt(panier);
+            
+            logger.info("Successfully validated panier {}", panierId);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            logger.error("Error validating panier {}: {}", panierId, e.getMessage(), e);
+            return ResponseEntity.badRequest().body("Erreur: " + e.getMessage());
+        }
     }
 
     @PostMapping("/panier/{panierId}/print")

@@ -38,14 +38,19 @@ public class StockService {
 
     @Transactional
     public void replenishStock(Produit produit, int quantity, String reason) {
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("La quantité doit être supérieure à 0");
+        }
+
         Long currentStock = produit.getStock() != null ? produit.getStock() : 0L;
-        produit.setStock(currentStock + (long)quantity);
+        Long newStock = currentStock + quantity;
+        produit.setStock(newStock);
         produitRepository.save(produit);
 
         StockHistory history = new StockHistory();
         history.setProduit(produit);
         history.setQuantityChanged(quantity);
-        history.setStockAfterChange(produit.getStock().intValue());
+        history.setStockAfterChange(newStock.intValue());
         history.setType("RESTOCK");
         history.setReason(reason);
         stockHistoryRepository.save(history);

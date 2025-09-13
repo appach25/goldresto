@@ -9,6 +9,12 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
@@ -18,49 +24,57 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
-            .authorizeHttpRequests(auth -> auth
-                // Public resources
-                .requestMatchers("/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
-                .requestMatchers("/login", "/error").permitAll()
-                .requestMatchers("/api/printer/**").permitAll()
-                .requestMatchers("/pos/panier/*/validate").permitAll()
-                
-                // POS and Sales
-                .requestMatchers("/pos/panier/*/validate").permitAll()
-                .requestMatchers("/pos/**").hasAnyAuthority("ROLE_EMPLOYEE", "ROLE_ADMIN", "ROLE_OWNER")
-                .requestMatchers("/panier/**").hasAnyAuthority("ROLE_EMPLOYEE", "ROLE_ADMIN", "ROLE_OWNER")
-                
-                // Product and Stock Management (Admin access)
-                .requestMatchers("/produits/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_OWNER")
-                .requestMatchers("/stock/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_OWNER")
-                
-                // Reports and System Management (Owner only)
-                .requestMatchers("/reports/**").hasAuthority("ROLE_OWNER")
-                .requestMatchers("/users/**").hasAuthority("ROLE_OWNER")
-                .requestMatchers("/system/**").hasAuthority("ROLE_OWNER")
-                
-                // All other URLs require authentication
-                .anyRequest().authenticated()
+            .headers(headers -> headers.frameOptions(frame -> frame.disable()))
+            .sessionManagement(session -> session
+                .sessionCreationPolicy(SessionCreationPolicy.ALWAYS)
             )
             .formLogin(form -> form
                 .loginPage("/login")
-                .defaultSuccessUrl("/", true)
+                .loginProcessingUrl("/login")
+                .defaultSuccessUrl("/pos", true)
+                .failureUrl("/login?error")
                 .permitAll()
             )
             .logout(logout -> logout
+                .logoutUrl("/logout")
                 .logoutSuccessUrl("/login?logout")
+                .invalidateHttpSession(true)
+                .deleteCookies("JSESSIONID")
                 .permitAll()
             )
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/css/**", "/js/**", "/images/**", "/webjars/**", "/uploads/**").permitAll()
+                .requestMatchers("/login", "/error", "/access-denied").permitAll()
+                .requestMatchers("/api/printer/**").permitAll()
+                .requestMatchers("/pos/**").permitAll()
+                .requestMatchers("/panier/**").permitAll()
+                .requestMatchers("/stock/**").permitAll()
+                .requestMatchers("/produits/**").permitAll()
+                .anyRequest().permitAll()
+            )
             .exceptionHandling(ex -> ex
+                .authenticationEntryPoint((request, response, authException) -> {
+                    response.sendRedirect("/login");
+                })
                 .accessDeniedPage("/access-denied")
             );
         
         return http.build();
     }
 
+
     @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(Arrays.asList("http://localhost:8081"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setAllowCredentials(true);
+        
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 }
