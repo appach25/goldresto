@@ -100,7 +100,8 @@ public class PrinterService {
             }
 
             StringBuilder receipt = new StringBuilder();
-            receipt.append("GOLD RESTO\n")
+            receipt.append("GOLDEN RESTO\n")
+                  .append("Tel: 4452 6904\n")
                   .append("----------------------------------------\n\n")
                   .append("Facture #: ").append(paiement.getId()).append("\n")
                   .append("Date: ").append(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))).append("\n")
