@@ -26,6 +26,10 @@
     <div th:replace="fragments/navbar :: navbar"></div>
 
     <div class="container mt-5 pt-3">
+        <!-- Debug info -->
+        <div class="alert alert-info mb-3">
+            <p>Current User: <span th:text="${currentUsername}"></span></p>
+        </div>
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2>Commandes en cours</h2>
             <div class="d-flex align-items-center">
@@ -57,13 +61,26 @@
                     </div>
                     <div class="card-body">
                         <div class="products-list mb-3">
-                            <div class="d-flex justify-content-between align-items-center mb-2" 
+                            <div class="d-flex align-items-center mb-2" 
                                  th:each="ligne : ${panier.lignesProduits}">
-                                <div>
-                                    <span class="fw-bold" th:text="${ligne?.produit?.nomProduit ?: 'Produit inconnu'}"></span>
-                                    <small class="text-muted" th:text="'x' + ${ligne.quantite}"></small>
+                                <!-- Delete button visible only to users with OWNER role -->
+                                <button th:if="${#authorization.expression('hasRole(''OWNER'')')}"
+                                        class="btn btn-sm btn-outline-danger me-2"
+                                        style="min-width: 32px; height: 32px; padding: 4px;"
+                                        th:onclick="'removeProduct(' + ${panier.id} + ', ' + ${ligne.id} + ')'">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                                <!-- Spacer div when button is not shown to maintain alignment -->
+                                <div th:unless="${#authorization.expression('hasRole(''OWNER'')')}"
+                                     style="width: 32px; margin-right: 0.5rem;"></div>
+                                <!-- Product info and price -->
+                                <div class="d-flex justify-content-between align-items-center w-100">
+                                    <div>
+                                        <span class="fw-bold" th:text="${ligne?.produit?.nomProduit ?: 'Produit inconnu'}"></span>
+                                        <small class="text-muted" th:text="'x' + ${ligne.quantite}"></small>
+                                    </div>
+                                    <span th:text="'$' + ${#numbers.formatDecimal(ligne.sousTotal, 1, 2)}"></span>
                                 </div>
-                                <span th:text="'$' + ${#numbers.formatDecimal(ligne.sousTotal, 1, 2)}"></span>
                             </div>
                         </div>
                         <hr>
@@ -186,6 +203,26 @@
 
         function addProduitToPanier(panierId) {
             window.location.href = '/pos?addProduitPanierId=' + panierId;
+        }
+
+        function removeProduct(panierId, ligneId) {
+            if (!confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) return;
+
+            fetch(`/pos/panier/${panierId}/product/${ligneId}`, {
+                method: 'DELETE'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    if (response.status === 403) {
+                        throw new Error('Vous n\'êtes pas autorisé à modifier cette commande');
+                    }
+                    throw new Error('Erreur lors de la suppression du produit');
+                }
+                location.reload();
+            })
+            .catch(error => {
+                alert(error.message);
+            });
         }
     </script>
 </body>

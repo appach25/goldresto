@@ -18,6 +18,8 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.Authentication;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -67,6 +69,11 @@ public class POSController {
     @Transactional(readOnly = true)
     public String paniers(Model model) {
         try {
+            // Get current user
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            String currentUsername = auth.getName();
+            model.addAttribute("currentUsername", currentUsername);
+            
             // Fetch active paniers
             List<Panier> paniers = panierRepository.findPaniersWithLignesAndProduits(PanierState.EN_COURS);
             model.addAttribute("paniers", paniers);
@@ -265,6 +272,9 @@ public class POSController {
         }
         Paiement savedPaiement = paiementRepository.save(paiement);
 
+        // Print client bill
+        printService.printClientBill(panier, savedPaiement);
+
         // Persist Journal after payment
         Journal journal = new Journal();
         journal.setPanierId(panier.getId()); // Set the original Panier ID
@@ -303,6 +313,45 @@ public class POSController {
         panierService.recalculateTotal(panierId);
 
         return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/panier/{panierId}/product/{ligneId}")
+    @ResponseBody
+    public ResponseEntity<?> deleteProduct(@PathVariable Long panierId, @PathVariable Long ligneId) {
+        try {
+            Panier panier = panierRepository.findByIdWithLignes(panierId)
+                .orElseThrow(() -> new IllegalArgumentException("Panier non trouvé"));
+
+            // Check if current user has OWNER role
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            boolean isOwner = auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_OWNER"));
+            
+            if (!isOwner) {
+                return ResponseEntity.status(403).body("Vous n'êtes pas autorisé à modifier cette commande");
+            }
+
+            // Find and remove the product line
+            LignedeProduit ligne = panier.getLignesProduits().stream()
+                .filter(l -> l.getId().equals(ligneId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Produit non trouvé dans le panier"));
+
+            // Return product to stock
+            stockService.replenishStock(ligne.getProduit(), ligne.getQuantite(), "Product removed from order");
+
+            // Remove the line
+            panier.removeLigneProduit(ligne);
+            panierRepository.save(panier);
+
+            // Recalculate total
+            panierService.recalculateTotal(panierId);
+
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            logger.error("Error deleting product from panier: ", e);
+            return ResponseEntity.badRequest().body("Erreur: " + e.getMessage());
+        }
     }
 
     @PostMapping("/panier/{panierId}/recalculateTotal")
