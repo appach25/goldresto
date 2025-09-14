@@ -34,7 +34,8 @@ public class PrinterService {
 
             StringBuilder receipt = new StringBuilder();
             receipt.append("ADDED PRODUCT\n\n")
-                  .append("Table: ").append(panier.getNumeroTable()).append("\n")
+                  .append(panier.getNumeroTable() >= 51 && panier.getNumeroTable() <= 61 ? "A emporter " : "Table: ")
+                  .append(panier.getNumeroTable()).append("\n")
                   .append("Date: ").append(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))).append("\n")
                   .append("----------------------------------------\n\n")
                   .append(newProduct.getQuantite())
@@ -66,7 +67,8 @@ public class PrinterService {
             receipt.append("KITCHEN ORDER\n\n")
                   .append("Commande #: ").append(panier.getId()).append("\n")
                   .append("Date: ").append(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))).append("\n")
-                  .append("Table: ").append(panier.getNumeroTable()).append("\n")
+                  .append(panier.getNumeroTable() >= 51 && panier.getNumeroTable() <= 61 ? "A emporter " : "Table: ")
+                  .append(panier.getNumeroTable()).append("\n")
                   .append("----------------------------------------\n\n");
             
             // Filter out beverages and print only non-beverage items
@@ -102,7 +104,8 @@ public class PrinterService {
                   .append("----------------------------------------\n\n")
                   .append("Facture #: ").append(paiement.getId()).append("\n")
                   .append("Date: ").append(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))).append("\n")
-                  .append("Table: ").append(panier.getNumeroTable()).append("\n")
+                  .append(panier.getNumeroTable() >= 51 && panier.getNumeroTable() <= 61 ? "A emporter " : "Table: ")
+                  .append(panier.getNumeroTable()).append("\n")
                   .append("----------------------------------------\n\n");
 
             // Print all products with their details

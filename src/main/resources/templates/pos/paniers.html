@@ -55,7 +55,7 @@
                     <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                         <div class="d-flex align-items-center">
                             <i class="bi bi-table me-2"></i>
-                            <span class="table-number" th:text="'Table ' + ${panier.numeroTable}"></span>
+                            <span class="table-number" th:text="${panier.numeroTable >= 51 && panier.numeroTable <= 61 ? 'A emporter ' + panier.numeroTable : 'Table ' + panier.numeroTable}"></span>
                         </div>
                         <small th:text="${#temporals.format(panier.date, 'dd/MM/yyyy HH:mm')}"></small>
                     </div>
