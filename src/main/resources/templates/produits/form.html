@@ -38,6 +38,19 @@
                 <label class="form-label">Prix</label>
                 <input type="number" step="0.01" class="form-control" th:field="*{prix}" required/>
             </div>
+
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">Promotion - Quantité (X)</label>
+                    <input type="number" min="0" class="form-control" th:field="*{promoQty}" placeholder="Ex: 3"/>
+                    <small class="text-muted">Laisser vide si pas de promotion</small>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Promotion - Prix (Y)</label>
+                    <input type="number" step="0.01" min="0" class="form-control" th:field="*{promoPrice}" placeholder="Ex: 100.00"/>
+                    <small class="text-muted">Prix pour X articles</small>
+                </div>
+            </div>
             
             <div class="mb-3">
                 <label class="form-label">Image</label>

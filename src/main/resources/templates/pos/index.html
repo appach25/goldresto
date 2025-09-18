@@ -52,6 +52,8 @@
                             th:data-produit-id=${produit.id} 
                             th:data-nom=${#strings.escapeJavaScript(produit.nomProduit)}
                             th:data-prix=${#numbers.formatDecimal(produit.prix,1,2)}
+                            th:data-promo-qty=${produit.promoQty}
+                            th:data-promo-price=${#numbers.formatDecimal(produit.promoPrice,1,2)}
                             th:data-stock=${produit.stock}
                             th:onclick="|addToCart(${produit.id})|">
                             <img th:if="${produit.imagePath}" 
@@ -130,6 +132,8 @@
                     id: produitId,
                     nomProduit: produitCard.dataset.nom,
                     prix: parseFloat(produitCard.dataset.prix),
+                    promoQty: produitCard.dataset.promoQty ? parseInt(produitCard.dataset.promoQty) : null,
+                    promoPrice: produitCard.dataset.promoPrice ? parseFloat(produitCard.dataset.promoPrice) : null,
                     stock: parseInt(produitCard.dataset.stock)
                 };
                 cartItems.set(produitId, {
@@ -180,12 +184,26 @@
         function updateCartDisplay() {
             const cartList = document.getElementById('cartItemsList');
             cartList.innerHTML = '';
-            let total = 0;
+            let total = new Decimal(0);
 
             cartItems.forEach((item, produitId) => {
                 if (item.produit && item.produit.prix) {
-                    const sousTotal = new Decimal(item.produit.prix).times(item.quantity);
-                    total = new Decimal(total).plus(sousTotal);
+                    let sousTotal = new Decimal(0);
+                    const unit = new Decimal(item.produit.prix);
+                    const qty = item.quantity;
+                    const promoQty = item.produit.promoQty;
+                    const promoPrice = item.produit.promoPrice != null ? new Decimal(item.produit.promoPrice) : null;
+
+                    if (promoQty && promoQty > 0 && promoPrice && promoPrice.greaterThanOrEqualTo(0)) {
+                        const bundles = Math.floor(qty / promoQty);
+                        const remainder = qty % promoQty;
+                        const bundlesTotal = promoPrice.times(bundles);
+                        const remainderTotal = unit.times(remainder);
+                        sousTotal = bundlesTotal.plus(remainderTotal);
+                    } else {
+                        sousTotal = unit.times(qty);
+                    }
+                    total = total.plus(sousTotal);
 
                     cartList.innerHTML += `
                         <div class="card mb-2">

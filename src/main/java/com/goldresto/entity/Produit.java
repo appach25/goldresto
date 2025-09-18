@@ -5,6 +5,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import java.math.BigDecimal;
+import jakarta.persistence.Column;
 
 @Entity
 public class Produit {
@@ -17,6 +18,11 @@ public class Produit {
     private Long stock;
     private String imagePath;
     private BigDecimal prix;
+    // Optional promotion: X items for Y price (e.g., 3 for 100)
+    @Column(name = "promo_qty")
+    private Integer promoQty;      // X
+    @Column(name = "promo_price")
+    private BigDecimal promoPrice; // Y
 
     // Getters and Setters
     public Long getId() {
@@ -65,5 +71,21 @@ public class Produit {
 
     public void setPrix(BigDecimal prix) {
         this.prix = prix;
+    }
+
+    public Integer getPromoQty() {
+        return promoQty;
+    }
+
+    public void setPromoQty(Integer promoQty) {
+        this.promoQty = promoQty;
+    }
+
+    public BigDecimal getPromoPrice() {
+        return promoPrice;
+    }
+
+    public void setPromoPrice(BigDecimal promoPrice) {
+        this.promoPrice = promoPrice;
     }
 }

@@ -101,10 +101,30 @@ public class LignedeProduit {
             }
         }
 
-        // Calculate sous-total
+        // Calculate sous-total with optional promotion: X items for Y price
         try {
-            this.sousTotal = prixUnitaire.multiply(BigDecimal.valueOf(quantite));
-            logger.debug("Calculated sousTotal={} for LignedeProduit {}", sousTotal, id);
+            BigDecimal total = BigDecimal.ZERO;
+
+            Integer promoQty = (produit != null) ? produit.getPromoQty() : null;
+            BigDecimal promoPrice = (produit != null) ? produit.getPromoPrice() : null;
+
+            boolean promoApplicable = promoQty != null && promoQty > 0 && promoPrice != null
+                && quantite != null && quantite > 0
+                && promoPrice.compareTo(BigDecimal.ZERO) >= 0
+                && prixUnitaire.compareTo(BigDecimal.ZERO) >= 0;
+
+            if (promoApplicable) {
+                int bundles = quantite / promoQty;
+                int remainder = quantite % promoQty;
+                BigDecimal bundlesTotal = promoPrice.multiply(BigDecimal.valueOf(bundles));
+                BigDecimal remainderTotal = prixUnitaire.multiply(BigDecimal.valueOf(remainder));
+                total = bundlesTotal.add(remainderTotal);
+            } else {
+                total = prixUnitaire.multiply(BigDecimal.valueOf(quantite));
+            }
+
+            this.sousTotal = total;
+            logger.debug("Calculated sousTotal={} for LignedeProduit {} (promoQty={}, promoPrice={})", sousTotal, id, promoQty, promoPrice);
         } catch (Exception e) {
             logger.error("Error calculating sousTotal for LignedeProduit {}: {}", id, e.getMessage());
             this.sousTotal = BigDecimal.ZERO;

@@ -72,13 +72,20 @@ public class PrinterService {
                   .append("----------------------------------------\n\n");
             
             // Filter out beverages and print only non-beverage items
+            boolean hasNonBeverage = false;
             for (LignedeProduit ligne : panier.getLignesProduits()) {
                 if (!"boisson".equalsIgnoreCase(ligne.getProduit().getCategorie())) {
+                    hasNonBeverage = true;
                     receipt.append(ligne.getQuantite())
                           .append("x ")
                           .append(ligne.getProduit().getNomProduit())
                           .append("\n");
                 }
+            }
+            // If the order contains only beverages, skip printing
+            if (!hasNonBeverage) {
+                logger.debug("Skipping kitchen receipt printing: order contains only beverages for panier {}", panier.getId());
+                return;
             }
             
             receipt.append("\n----------------------------------------\n")
