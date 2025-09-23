@@ -95,6 +95,10 @@
                                         th:onclick="'addProduitToPanier(' + ${panier.id} + ')'">
                                     <i class="bi bi-plus-square me-2"></i> Ajouter
                                 </button>
+                                <button class="btn btn-warning ms-2"
+                                        th:onclick="'changerCommande(' + ${panier.id} + ')'">
+                                    <i class="bi bi-pencil-square me-2"></i> Changer commande
+                                </button>
                             </div>
                             <!-- Payment button -->
                             <button class="btn btn-primary"
@@ -203,6 +207,11 @@
 
         function addProduitToPanier(panierId) {
             window.location.href = '/pos?addProduitPanierId=' + panierId;
+        }
+
+        function changerCommande(panierId) {
+            // Load the panier in POS for full modification
+            window.location.href = '/pos?editPanierId=' + panierId + '&fullEdit=true';
         }
 
         function removeProduct(panierId, ligneId) {

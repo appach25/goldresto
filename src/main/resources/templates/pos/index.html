@@ -46,16 +46,30 @@
 
             <!-- Products Grid -->
             <div class="col-md-8 product-grid p-4">
-                <div class="row g-4">
+                <!-- Search box for products -->
+                <div class="mb-3">
+                    <div class="input-group align-items-center">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input id="productSearch" type="text" class="form-control" placeholder="Rechercher un produit..." oninput="filterProducts()">
+                        <button id="clearSearchBtn" class="btn btn-outline-secondary" type="button" title="Effacer" aria-label="Effacer" style="display:none;">
+                            <i class="bi bi-x-circle"></i>
+                        </button>
+                        <span class="input-group-text">
+                            <span class="badge bg-secondary" id="productCountBadge">0</span>
+                        </span>
+                    </div>
+                </div>
+                <div class="row g-4" id="productGrid">
                     <div th:each="produit : ${produits}" class="col-6 col-md-4 col-lg-3">
-                        <div class="card product-card" 
-                            th:data-produit-id=${produit.id} 
-                            th:data-nom=${#strings.escapeJavaScript(produit.nomProduit)}
-                            th:data-prix=${#numbers.formatDecimal(produit.prix,1,2)}
-                            th:data-promo-qty=${produit.promoQty}
-                            th:data-promo-price=${#numbers.formatDecimal(produit.promoPrice,1,2)}
-                            th:data-stock=${produit.stock}
-                            th:onclick="|addToCart(${produit.id})|">
+                        <div class="card product-card"
+                             th:attr="data-produit-id=${produit.id},
+                                      data-nom=${produit.nomProduit},
+                                      data-categorie=${produit.categorie},
+                                      data-prix=${#numbers.formatDecimal(produit.prix,1,2)},
+                                      data-promo-qty=${produit.promoQty},
+                                      data-promo-price=${#numbers.formatDecimal(produit.promoPrice,1,2)},
+                                      data-stock=${produit.stock}"
+                             th:onclick="|addToCart(${produit.id})|">
                             <img th:if="${produit.imagePath}" 
                                  th:src="@{'/'+${produit.imagePath}}" 
                                  class="card-img-top product-image"
@@ -117,6 +131,49 @@
     <script>
         let currentPanier = null;
         let cartItems = new Map();
+        let isFullEditMode = false; // when true, existing items are fully editable
+        // Normalize text by lowercasing and removing accents/diacritics for better matching
+        function normalizeText(str) {
+            if (!str) return '';
+            try {
+                return str
+                    .toString()
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .toLowerCase()
+                    .trim();
+            } catch (_) {
+                // Fallback if browser doesn't support normalize
+                return str.toString().toLowerCase().trim();
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const search = document.getElementById('productSearch');
+            const clearBtn = document.getElementById('clearSearchBtn');
+            if (search) {
+                search.focus();
+                // Ensure filtering is wired even if inline oninput fails due to cache
+                search.addEventListener('input', filterProducts);
+                search.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        search.value = '';
+                        filterProducts();
+                    }
+                });
+                // Trigger initial filter to setup badge and button state
+                filterProducts();
+            }
+            if (clearBtn) {
+                clearBtn.addEventListener('click', () => {
+                    if (search) {
+                        search.value = '';
+                        filterProducts();
+                        search.focus();
+                    }
+                });
+            }
+        });
 
         function addToCart(produitId) {
             const existingItem = cartItems.get(produitId);
@@ -167,6 +224,51 @@
             if (item && !item.readonly) {
                 cartItems.delete(produitId);
                 updateCartDisplay();
+            }
+        }
+
+        // Global function used by the product search input's oninput handler
+        function filterProducts() {
+            const input = document.getElementById('productSearch');
+            if (!input) return;
+            const rawQuery = (input.value || '');
+            const query = normalizeText(rawQuery);
+            const tokens = query.split(/\s+/).filter(Boolean);
+            const cards = document.querySelectorAll('#productGrid .product-card');
+            if (!cards || cards.length === 0) return;
+
+            let visibleCount = 0;
+
+            if (tokens.length === 0) {
+                cards.forEach(card => {
+                    const col = card.parentElement;
+                    if (col) col.style.display = '';
+                });
+                visibleCount = cards.length;
+            } else {
+                cards.forEach(card => {
+                    const titleEl = card.querySelector('.card-title');
+                    const nameRaw = (card.dataset && card.dataset.nom ? card.dataset.nom : (titleEl ? titleEl.textContent : ''));
+                    const catRaw = (card.dataset && card.dataset.categorie ? card.dataset.categorie : '');
+                    const haystack = `${normalizeText(nameRaw)} ${normalizeText(catRaw)}`;
+
+                    // All tokens must be present for a match (AND semantics)
+                    const match = tokens.every(t => haystack.includes(t));
+                    const col = card.parentElement;
+                    if (col) col.style.display = match ? '' : 'none';
+                    if (match) visibleCount++;
+                });
+            }
+
+            // Update badge and clear button state
+            const badge = document.getElementById('productCountBadge');
+            if (badge) {
+                badge.textContent = String(visibleCount);
+                badge.className = `badge ${visibleCount > 0 ? 'bg-secondary' : 'bg-warning text-dark'}`;
+            }
+            const clearBtn = document.getElementById('clearSearchBtn');
+            if (clearBtn) {
+                clearBtn.style.display = rawQuery && rawQuery.trim().length > 0 ? '' : 'none';
             }
         }
 
@@ -329,6 +431,8 @@
             // Populate table numbers initially
             await populateTableNumbers();
             const editPanierId = getQueryParam('editPanierId');
+            const fullEdit = getQueryParam('fullEdit');
+            isFullEditMode = (fullEdit === 'true');
             const addProduitPanierId = getQueryParam('addProduitPanierId');
             if (editPanierId) {
                 await editPanier(editPanierId);
@@ -358,7 +462,7 @@
                                 stock: ligne.produit.stock
                             },
                             quantity: ligne.quantite,
-                            readonly: true // mark as readonly
+                            readonly: !isFullEditMode // in full edit mode, make editable
                         });
                     });
                 }
@@ -401,9 +505,20 @@
                 // If editing or adding product to existing panier
                 if (currentPanier && currentPanier.id) {
                     try {
+                        // In full edit mode, clear existing products then re-add everything from cart
+                        if (isFullEditMode) {
+                            const clearResp = await fetch(`/pos/panier/${currentPanier.id}/clearProducts`, { method: 'POST' });
+                            if (!clearResp.ok) {
+                                const err = await clearResp.text();
+                                alert(err);
+                                throw new Error(err);
+                            }
+                        }
+
                         const products = [];
                         cartItems.forEach((item, produitId) => {
-                            if (!item.readonly) { // Only add new items
+                            // In full edit, include all items; otherwise only non-readonly (new) items
+                            if (isFullEditMode || !item.readonly) {
                                 products.push({
                                     produitId: produitId,
                                     quantite: item.quantity,
@@ -412,14 +527,13 @@
                             }
                         });
 
-                        // Add new products one by one
+                        // Add products one by one
                         for (const product of products) {
-                            const response = await fetch(`/pos/panier/${currentPanier.id}/addProduct?produitId=${product.produitId}&quantite=${product.quantite}`, {
+                            const resp = await fetch(`/pos/panier/${currentPanier.id}/addProduct?produitId=${product.produitId}&quantite=${product.quantite}`, {
                                 method: 'POST'
                             });
-                            
-                            if (!response.ok) {
-                                const errorText = await response.text();
+                            if (!resp.ok) {
+                                const errorText = await resp.text();
                                 alert(errorText);
                                 throw new Error(errorText);
                             }

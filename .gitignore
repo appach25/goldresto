@@ -36,3 +36,10 @@ build/
 /uploads/
 application-dev.properties
 *.log
+
+
+# Archives and logs
+logs/
+*.gz
+*.zip
+maven-dist/

@@ -306,6 +306,18 @@ public class POSController {
     public ResponseEntity<?> clearProducts(@PathVariable Long panierId) {
         Panier panier = panierRepository.findByIdWithLignes(panierId)
             .orElseThrow(() -> new IllegalArgumentException("Invalid panier ID"));
+
+        // Replenish stock for each existing line before clearing
+        if (panier.getLignesProduits() != null) {
+            for (LignedeProduit ligne : new ArrayList<>(panier.getLignesProduits())) {
+                try {
+                    stockService.replenishStock(ligne.getProduit(), ligne.getQuantite(), "Commande modifiée - remise en stock");
+                } catch (Exception e) {
+                    logger.warn("Failed to replenish stock for produit {}: {}", ligne.getProduit().getId(), e.getMessage());
+                }
+            }
+        }
+
         panier.getLignesProduits().clear();
         panierRepository.save(panier);
 
@@ -322,14 +334,7 @@ public class POSController {
             Panier panier = panierRepository.findByIdWithLignes(panierId)
                 .orElseThrow(() -> new IllegalArgumentException("Panier non trouvé"));
 
-            // Check if current user has OWNER role
-            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            boolean isOwner = auth.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_OWNER"));
-            
-            if (!isOwner) {
-                return ResponseEntity.status(403).body("Vous n'êtes pas autorisé à modifier cette commande");
-            }
+            // All authenticated POS roles are allowed (class-level @PreAuthorize applies)
 
             // Find and remove the product line
             LignedeProduit ligne = panier.getLignesProduits().stream()
