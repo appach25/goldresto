@@ -505,16 +505,6 @@
                 // If editing or adding product to existing panier
                 if (currentPanier && currentPanier.id) {
                     try {
-                        // In full edit mode, clear existing products then re-add everything from cart
-                        if (isFullEditMode) {
-                            const clearResp = await fetch(`/pos/panier/${currentPanier.id}/clearProducts`, { method: 'POST' });
-                            if (!clearResp.ok) {
-                                const err = await clearResp.text();
-                                alert(err);
-                                throw new Error(err);
-                            }
-                        }
-
                         const products = [];
                         cartItems.forEach((item, produitId) => {
                             // In full edit, include all items; otherwise only non-readonly (new) items
@@ -527,15 +517,44 @@
                             }
                         });
 
-                        // Add products one by one
-                        for (const product of products) {
-                            const resp = await fetch(`/pos/panier/${currentPanier.id}/addProduct?produitId=${product.produitId}&quantite=${product.quantite}`, {
-                                method: 'POST'
-                            });
-                            if (!resp.ok) {
-                                const errorText = await resp.text();
-                                alert(errorText);
-                                throw new Error(errorText);
+                        if (isFullEditMode) {
+                            // In full edit, compute diffs vs currentPanier and update quantities WITHOUT printing
+                            const oldQty = new Map();
+                            if (currentPanier.lignesProduits) {
+                                currentPanier.lignesProduits.forEach(l => {
+                                    oldQty.set(l.produit.id, l.quantite);
+                                });
+                            }
+                            const newQty = new Map();
+                            products.forEach(p => newQty.set(p.produitId, p.quantite));
+
+                            // Union of product IDs
+                            const ids = new Set([...oldQty.keys(), ...newQty.keys()]);
+                            for (const id of ids) {
+                                const desired = newQty.get(id) || 0; // 0 removes the line
+                                const current = oldQty.get(id) || 0;
+                                if (desired !== current) {
+                                    const resp = await fetch(`/pos/panier/${currentPanier.id}/updateProductQuantity?produitId=${id}&quantite=${desired}`, {
+                                        method: 'POST'
+                                    });
+                                    if (!resp.ok) {
+                                        const errorText = await resp.text();
+                                        alert(errorText);
+                                        throw new Error(errorText);
+                                    }
+                                }
+                            }
+                        } else {
+                            // Not full edit: only send newly added items using addProduct (this will print the new items)
+                            for (const product of products) {
+                                const resp = await fetch(`/pos/panier/${currentPanier.id}/addProduct?produitId=${product.produitId}&quantite=${product.quantite}`, {
+                                    method: 'POST'
+                                });
+                                if (!resp.ok) {
+                                    const errorText = await resp.text();
+                                    alert(errorText);
+                                    throw new Error(errorText);
+                                }
                             }
                         }
 
@@ -543,7 +562,7 @@
                         window.location.href = '/pos/paniers';
                         return;
                     } catch (error) {
-                        alert('Erreur lors de l\'ajout des produits: ' + error.message);
+                        alert('Erreur lors de la mise à jour des produits: ' + error.message);
                         return;
                     }
                 }

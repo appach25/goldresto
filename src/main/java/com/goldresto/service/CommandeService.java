@@ -24,7 +24,7 @@ public class CommandeService {
         ligne.setQuantite(quantite);
         ligne.setPanier(panier);
 
-        // Print the newly added product
-        printService.printAddedProduct(panier, ligne);
+        // Print only the quantity that was just added
+        printService.printAddedProduct(panier, ligne, quantite);
     }
 }

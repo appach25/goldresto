@@ -90,6 +90,80 @@ public class POSController {
         }
     }
 
+    @PostMapping("/panier/{panierId}/updateProductQuantity")
+    @ResponseBody
+    @Transactional
+    public ResponseEntity<?> updateProductQuantity(
+        @PathVariable Long panierId,
+        @RequestParam Long produitId,
+        @RequestParam Integer quantite
+    ) {
+        try {
+            if (quantite == null || quantite < 0) {
+                return ResponseEntity.badRequest().body("Quantité invalide");
+            }
+
+            Panier panier = panierRepository.findByIdWithLignes(panierId)
+                .orElseThrow(() -> new IllegalArgumentException("Panier non trouvé"));
+            Produit produit = produitRepository.findById(produitId)
+                .orElseThrow(() -> new IllegalArgumentException("Produit non trouvé"));
+
+            // Find existing line
+            LignedeProduit ligne = panier.getLignesProduits().stream()
+                .filter(l -> l.getProduit().getId().equals(produitId))
+                .findFirst()
+                .orElse(null);
+
+            int currentQty = (ligne != null ? ligne.getQuantite() : 0);
+
+            if (quantite == 0) {
+                if (ligne != null) {
+                    // Replenish stock for removed quantity
+                    try {
+                        stockService.replenishStock(produit, currentQty, "Quantité mise à 0");
+                    } catch (Exception e) {
+                        logger.warn("Failed to replenish stock while setting qty 0 for produit {}: {}", produit.getId(), e.getMessage());
+                    }
+                    panier.removeLigneProduit(ligne);
+                }
+            } else {
+                int delta = quantite - currentQty;
+                if (delta > 0) {
+                    // Need to decrease stock for the added amount
+                    stockService.checkAndDecreaseStock(produit, delta);
+                } else if (delta < 0) {
+                    // Replenish stock for the reduced amount
+                    try {
+                        stockService.replenishStock(produit, -delta, "Réduction de quantité");
+                    } catch (Exception e) {
+                        logger.warn("Failed to replenish stock for produit {}: {}", produit.getId(), e.getMessage());
+                    }
+                }
+
+                if (ligne == null) {
+                    ligne = new LignedeProduit();
+                    ligne.setPanier(panier);
+                    ligne.setProduit(produit);
+                    panier.getLignesProduits().add(ligne);
+                }
+                ligne.setQuantite(quantite);
+                ligne.setPrixUnitaire(produit.getPrix());
+                ligne.calculateSousTotal();
+            }
+
+            // Persist and recalc totals
+            panier = panierService.savePanier(panier);
+            panierService.recalculateTotal(panier.getId());
+
+            Panier updated = panierRepository.findByIdWithLignes(panier.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Panier non trouvé"));
+            return ResponseEntity.ok(updated);
+        } catch (Exception e) {
+            logger.error("Error updating product quantity: ", e);
+            return ResponseEntity.badRequest().body("Erreur: " + e.getMessage());
+        }
+    }
+
     @PostMapping("/panier/create")
     @ResponseBody
     @Transactional
@@ -217,8 +291,8 @@ public class POSController {
             // Recalculate and persist total after modification
             panierService.recalculateTotal(panier.getId());
 
-            // Print the newly added product
-            printService.printAddedProduct(panier, ligne);
+            // Print only the delta quantity that was added now
+            printService.printAddedProduct(panier, ligne, quantite);
 
             // Fetch updated panier with recalculated total
             Panier updatedPanier = panierRepository.findByIdWithLignes(panier.getId())
@@ -258,7 +332,9 @@ public class POSController {
 
     @PostMapping("/paiement/{panierId}")
     @ResponseBody
-    public ResponseEntity<?> processPaiement(@PathVariable Long panierId, @RequestBody Paiement paiement) {
+    public ResponseEntity<?> processPaiement(@PathVariable Long panierId,
+                                             @RequestBody Paiement paiement,
+                                             @RequestParam(name = "print", defaultValue = "true") boolean printBill) {
         Panier panier = panierRepository.findByIdWithLignes(panierId)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid panier ID"));
         
@@ -272,8 +348,10 @@ public class POSController {
         }
         Paiement savedPaiement = paiementRepository.save(paiement);
 
-        // Print client bill
-        printService.printClientBill(panier, savedPaiement);
+        // Print client bill (optional)
+        if (printBill) {
+            printService.printClientBill(panier, savedPaiement);
+        }
 
         // Persist Journal after payment
         Journal journal = new Journal();

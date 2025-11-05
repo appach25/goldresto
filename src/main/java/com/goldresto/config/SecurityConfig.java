@@ -37,8 +37,8 @@ public class SecurityConfig {
                 
                 // Reports and System Management (Owner only)
                 .requestMatchers("/reports/**").hasAuthority("ROLE_OWNER")
-                .requestMatchers("/users/**").hasAuthority("ROLE_OWNER")
-                .requestMatchers("/system/**").hasAuthority("ROLE_OWNER")
+                .requestMatchers("/users/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_OWNER")
+                .requestMatchers("/system/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_OWNER")
                 
                 // All other URLs require authentication
                 .anyRequest().authenticated()

@@ -189,7 +189,9 @@
                 montantAPayer: parseFloat(document.getElementById('montantAPayer').value)
             };
 
-            fetch(`/pos/paiement/${currentPanierId}`, {
+            const shouldPrint = confirm('Voulez-vous imprimer la facture ?');
+
+            fetch(`/pos/paiement/${currentPanierId}?print=${shouldPrint}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
