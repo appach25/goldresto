@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Ingrédients - [[${produit.nomProduit}]]</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/css/main.css" rel="stylesheet">
+    <style>
+        body { padding-top: 100px !important; }
+    </style>
+</head>
+<body>
+    <div th:replace="fragments/navbar :: navbar"></div>
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h2>Ingrédients</h2>
+                <p class="text-muted mb-0">[[${produit.nomProduit}]]</p>
+            </div>
+            <a href="/produits" class="btn btn-outline-secondary">Retour aux produits</a>
+        </div>
+
+        <div class="alert alert-warning" th:if="${produit.noRecipe}">
+            Ce produit est marqué comme <strong>sans recette</strong>. Aucun ingrédient n'est requis.
+        </div>
+
+        <div class="card mb-4" th:if="${!produit.noRecipe}">
+            <div class="card-header">
+                <h5 class="mb-0">Ajouter un ingrédient</h5>
+            </div>
+            <div class="card-body">
+                <form th:action="@{/produits/{id}/ingredients(id=${produit.id})}" method="post" th:object="${ingredient}" class="row g-3">
+                    <div class="col-md-5">
+                        <label class="form-label">Ingrédient</label>
+                        <input type="text" class="form-control" th:field="*{nom}" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Quantité</label>
+                        <input type="number" step="0.01" class="form-control" th:field="*{quantite}" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Unité</label>
+                        <input type="text" class="form-control" th:field="*{unite}" placeholder="kg, litre" required>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100">Ajouter</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Liste des ingrédients</h5>
+            </div>
+            <div class="card-body">
+                <div th:if="${#lists.isEmpty(ingredients)}" class="text-muted">Aucun ingrédient enregistré.</div>
+                <div class="table-responsive" th:unless="${#lists.isEmpty(ingredients)}">
+                    <table class="table table-striped align-middle">
+                        <thead>
+                            <tr>
+                                <th>Ingrédient</th>
+                                <th>Quantité</th>
+                                <th>Unité</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="item : ${ingredients}">
+                                <td th:text="${item.nom}"></td>
+                                <td th:text="${item.quantite}"></td>
+                                <td th:text="${item.unite}"></td>
+                                <td class="text-end">
+                                    <a th:href="@{/produits/{id}/ingredients/{ingredientId}/delete(id=${produit.id}, ingredientId=${item.id})}"
+                                       class="btn btn-outline-danger btn-sm"
+                                       onclick="return confirm('Supprimer cet ingrédient ?')">Supprimer</a>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

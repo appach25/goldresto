@@ -24,6 +24,9 @@ public class Produit {
     @Column(name = "promo_price")
     private BigDecimal promoPrice; // Y
 
+    @Column(name = "no_recipe")
+    private Boolean noRecipe;
+
     // Getters and Setters
     public Long getId() {
         return id;
@@ -87,5 +90,13 @@ public class Produit {
 
     public void setPromoPrice(BigDecimal promoPrice) {
         this.promoPrice = promoPrice;
+    }
+
+    public boolean isNoRecipe() {
+        return Boolean.TRUE.equals(noRecipe);
+    }
+
+    public void setNoRecipe(Boolean noRecipe) {
+        this.noRecipe = noRecipe;
     }
 }

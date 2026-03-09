@@ -30,6 +30,7 @@
                     <td th:text="${#numbers.formatDecimal(produit.prix, 1, 2)}"></td>
                     <td>
                         <a th:href="@{/produits/edit/{id}(id=${produit.id})}" class="btn btn-warning btn-sm">Modifier</a>
+                        <a th:href="@{/produits/{id}/ingredients(id=${produit.id})}" class="btn btn-info btn-sm">Voir ingrédients</a>
                         <a th:href="@{/produits/delete/{id}(id=${produit.id})}" class="btn btn-danger btn-sm" 
                            onclick="return confirm('Êtes-vous sûr de vouloir supprimer ce produit?')">Supprimer</a>
                     </td>

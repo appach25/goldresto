@@ -1,6 +1,8 @@
 package com.goldresto.controller;
 
+import com.goldresto.entity.Ingredient;
 import com.goldresto.entity.Produit;
+import com.goldresto.repository.IngredientRepository;
 import com.goldresto.repository.ProduitRepository;
 import com.goldresto.service.StorageService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +26,9 @@ public class ProduitController {
 
     @Autowired
     private ProduitRepository produitRepository;
+
+    @Autowired
+    private IngredientRepository ingredientRepository;
 
     @Autowired
     private StorageService storageService;
@@ -71,5 +76,33 @@ public class ProduitController {
                 .orElseThrow(() -> new IllegalArgumentException("Invalid produit Id:" + id));
         produitRepository.delete(produit);
         return "redirect:/produits";
+    }
+
+    @GetMapping("/{id}/ingredients")
+    public String viewIngredients(@PathVariable Long id, Model model) {
+        Produit produit = produitRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid produit Id:" + id));
+        model.addAttribute("produit", produit);
+        model.addAttribute("ingredients", ingredientRepository.findByProduitId(id));
+        model.addAttribute("ingredient", new Ingredient());
+        return "produits/ingredients";
+    }
+
+    @PostMapping("/{id}/ingredients")
+    public String addIngredient(@PathVariable Long id, @ModelAttribute Ingredient ingredient) {
+        Produit produit = produitRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid produit Id:" + id));
+        if (produit.isNoRecipe()) {
+            return "redirect:/produits/" + id + "/ingredients";
+        }
+        ingredient.setProduit(produit);
+        ingredientRepository.save(ingredient);
+        return "redirect:/produits/" + id + "/ingredients";
+    }
+
+    @GetMapping("/{id}/ingredients/{ingredientId}/delete")
+    public String deleteIngredient(@PathVariable Long id, @PathVariable Long ingredientId) {
+        ingredientRepository.deleteById(ingredientId);
+        return "redirect:/produits/" + id + "/ingredients";
     }
 }

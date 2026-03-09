@@ -46,10 +46,42 @@
                     </li>
 
                     <!-- Reports - Owner Only -->
-                    <li class="nav-item" sec:authorize="hasAuthority('ROLE_OWNER')">
-                        <a class="nav-link" href="/reports">
-                            <i class="bi bi-graph-up"></i> Rapports
+                    <li class="nav-item dropdown" sec:authorize="hasAuthority('ROLE_OWNER')">
+                        <a class="nav-link dropdown-toggle" href="#" id="reportsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-graph-up"></i> Rapport
                         </a>
+                        <ul class="dropdown-menu" aria-labelledby="reportsDropdown">
+                            <li>
+                                <a class="dropdown-item" href="/reports">
+                                    <i class="bi bi-speedometer2 me-2"></i> Tableau de bord
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="/reports/period">
+                                    <i class="bi bi-calendar-range me-2"></i> Rapport périodique
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="/reports/daily">
+                                    <i class="bi bi-calendar-event me-2"></i> Rapport journalier
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="/reports/products">
+                                    <i class="bi bi-box-seam me-2"></i> Analyse produits
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="/reports/categories">
+                                    <i class="bi bi-tags me-2"></i> Analyse catégories
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="/reports/employees">
+                                    <i class="bi bi-people me-2"></i> Performance employés
+                                </a>
+                            </li>
+                        </ul>
                     </li>
                     <!-- User Management - Owner Only -->
                     <li class="nav-item" sec:authorize="hasAuthority('ROLE_OWNER')">
