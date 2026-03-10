@@ -1,6 +1,6 @@
 /* Main content padding for fixed navbar */
 body {
-    padding-top: 70px; /* Height of navbar plus some extra space */
+    padding-top: 96px !important; /* Height of navbar plus extra space */
 }
 
 /* Ensure navbar stays on top */

@@ -44,6 +44,16 @@
                             <i class="bi bi-box-seam"></i> Stock
                         </a>
                     </li>
+                    <li class="nav-item" sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')">
+                        <a class="nav-link" href="/ingredients">
+                            <i class="bi bi-basket"></i> Ingrédients
+                        </a>
+                    </li>
+                    <li class="nav-item" sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')">
+                        <a class="nav-link" href="/achats">
+                            <i class="bi bi-bag-check"></i> Achats
+                        </a>
+                    </li>
 
                     <!-- Reports - Owner Only -->
                     <li class="nav-item dropdown" sec:authorize="hasAuthority('ROLE_OWNER')">

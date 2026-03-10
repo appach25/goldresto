@@ -9,13 +9,18 @@ public class Ingredient {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "produit_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "produit_id", nullable = true)
     private Produit produit;
 
+    @Column(nullable = false, unique = true)
     private String nom;
-    private BigDecimal quantite;
-    private String unite;
+
+    @Column(nullable = false)
+    private String uniteStock;
+
+    @Column(nullable = false)
+    private BigDecimal stockActuel = BigDecimal.ZERO;
 
     public Long getId() {
         return id;
@@ -41,19 +46,19 @@ public class Ingredient {
         this.nom = nom;
     }
 
-    public BigDecimal getQuantite() {
-        return quantite;
+    public String getUniteStock() {
+        return uniteStock;
     }
 
-    public void setQuantite(BigDecimal quantite) {
-        this.quantite = quantite;
+    public void setUniteStock(String uniteStock) {
+        this.uniteStock = uniteStock;
     }
 
-    public String getUnite() {
-        return unite;
+    public BigDecimal getStockActuel() {
+        return stockActuel;
     }
 
-    public void setUnite(String unite) {
-        this.unite = unite;
+    public void setStockActuel(BigDecimal stockActuel) {
+        this.stockActuel = stockActuel;
     }
 }

@@ -2,7 +2,9 @@ package com.goldresto.controller;
 
 import com.goldresto.entity.Ingredient;
 import com.goldresto.entity.Produit;
+import com.goldresto.entity.ProduitIngredient;
 import com.goldresto.repository.IngredientRepository;
+import com.goldresto.repository.ProduitIngredientRepository;
 import com.goldresto.repository.ProduitRepository;
 import com.goldresto.service.StorageService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +31,9 @@ public class ProduitController {
 
     @Autowired
     private IngredientRepository ingredientRepository;
+
+    @Autowired
+    private ProduitIngredientRepository produitIngredientRepository;
 
     @Autowired
     private StorageService storageService;
@@ -83,26 +88,52 @@ public class ProduitController {
         Produit produit = produitRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid produit Id:" + id));
         model.addAttribute("produit", produit);
-        model.addAttribute("ingredients", ingredientRepository.findByProduitId(id));
+        model.addAttribute("ingredients", produitIngredientRepository.findByProduitId(id));
+        model.addAttribute("catalog", ingredientRepository.findAll());
         model.addAttribute("ingredient", new Ingredient());
         return "produits/ingredients";
     }
 
     @PostMapping("/{id}/ingredients")
-    public String addIngredient(@PathVariable Long id, @ModelAttribute Ingredient ingredient) {
+    public String addIngredient(
+        @PathVariable Long id,
+        @RequestParam(required = false) Long ingredientId,
+        @RequestParam(required = false) String nom,
+        @RequestParam(required = false) java.math.BigDecimal quantite
+    ) {
         Produit produit = produitRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid produit Id:" + id));
         if (produit.isNoRecipe()) {
             return "redirect:/produits/" + id + "/ingredients";
         }
-        ingredient.setProduit(produit);
-        ingredientRepository.save(ingredient);
+        Ingredient ingredient;
+        if (ingredientId != null) {
+            ingredient = ingredientRepository.findById(ingredientId)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid ingredient Id:" + ingredientId));
+        } else {
+            if (nom == null || nom.isBlank()) {
+                return "redirect:/produits/" + id + "/ingredients";
+            }
+            ingredient = ingredientRepository.findByNomIgnoreCase(nom)
+                .orElseGet(() -> {
+                    Ingredient created = new Ingredient();
+                    created.setNom(nom.trim());
+                    return ingredientRepository.save(created);
+                });
+        }
+
+        ProduitIngredient produitIngredient = new ProduitIngredient();
+        produitIngredient.setProduit(produit);
+        produitIngredient.setIngredient(ingredient);
+        produitIngredient.setQuantite(quantite);
+        produitIngredient.setUnite(ingredient.getUniteStock());
+        produitIngredientRepository.save(produitIngredient);
         return "redirect:/produits/" + id + "/ingredients";
     }
 
     @GetMapping("/{id}/ingredients/{ingredientId}/delete")
     public String deleteIngredient(@PathVariable Long id, @PathVariable Long ingredientId) {
-        ingredientRepository.deleteById(ingredientId);
+        produitIngredientRepository.deleteById(ingredientId);
         return "redirect:/produits/" + id + "/ingredients";
     }
 }

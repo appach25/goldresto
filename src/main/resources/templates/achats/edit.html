@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Modifier achat - Belasyet</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/css/main.css" rel="stylesheet">
+    <style>
+        body { padding-top: 120px !important; }
+    </style>
+</head>
+<body>
+    <div th:replace="fragments/navbar :: navbar"></div>
+    <div class="container mt-5">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2>Modifier achat</h2>
+            <a class="btn btn-outline-secondary" th:href="@{/achats/{id}(id=${achat.id})}">Retour</a>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <form th:action="@{/achats/{id}(id=${achat.id})}" th:object="${achat}" method="post">
+                    <div class="mb-3">
+                        <label class="form-label">Fournisseur</label>
+                        <input type="text" class="form-control" th:field="*{fournisseur}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Date</label>
+                        <input type="date" class="form-control" th:field="*{dateAchat}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Référence facture</label>
+                        <input type="text" class="form-control" th:field="*{referenceFacture}">
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">Mettre à jour</button>
+                        <a th:href="@{/achats/{id}(id=${achat.id})}" class="btn btn-secondary">Annuler</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

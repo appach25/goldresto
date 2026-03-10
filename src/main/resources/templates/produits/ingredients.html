@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title>Ingrédients - [[${produit.nomProduit}]]</title>
+    <title>Recette - [[${produit.nomProduit}]]</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="/css/main.css" rel="stylesheet">
     <style>
@@ -14,7 +14,7 @@
     <div class="container mt-4">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <div>
-                <h2>Ingrédients</h2>
+                <h2>Recette</h2>
                 <p class="text-muted mb-0">[[${produit.nomProduit}]]</p>
             </div>
             <a href="/produits" class="btn btn-outline-secondary">Retour aux produits</a>
@@ -26,21 +26,20 @@
 
         <div class="card mb-4" th:if="${!produit.noRecipe}">
             <div class="card-header">
-                <h5 class="mb-0">Ajouter un ingrédient</h5>
+                <h5 class="mb-0">Ajouter un ingrédient à la recette</h5>
             </div>
             <div class="card-body">
-                <form th:action="@{/produits/{id}/ingredients(id=${produit.id})}" method="post" th:object="${ingredient}" class="row g-3">
+                <form th:action="@{/produits/{id}/ingredients(id=${produit.id})}" method="post" class="row g-3">
                     <div class="col-md-5">
-                        <label class="form-label">Ingrédient</label>
-                        <input type="text" class="form-control" th:field="*{nom}" required>
+                        <label class="form-label">Ingrédient existant</label>
+                        <select class="form-select" name="ingredientId">
+                            <option value="">-- Choisir un ingrédient --</option>
+                            <option th:each="item : ${catalog}" th:value="${item.id}" th:text="${item.nom}"></option>
+                        </select>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label">Quantité</label>
-                        <input type="number" step="0.01" class="form-control" th:field="*{quantite}" required>
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label">Unité</label>
-                        <input type="text" class="form-control" th:field="*{unite}" placeholder="kg, litre" required>
+                        <input type="number" step="0.01" class="form-control" name="quantite" required>
                     </div>
                     <div class="col-md-2 d-flex align-items-end">
                         <button type="submit" class="btn btn-primary w-100">Ajouter</button>
@@ -51,7 +50,7 @@
 
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0">Liste des ingrédients</h5>
+                <h5 class="mb-0">Ingrédients de la recette</h5>
             </div>
             <div class="card-body">
                 <div th:if="${#lists.isEmpty(ingredients)}" class="text-muted">Aucun ingrédient enregistré.</div>
@@ -67,7 +66,7 @@
                         </thead>
                         <tbody>
                             <tr th:each="item : ${ingredients}">
-                                <td th:text="${item.nom}"></td>
+                                <td th:text="${item.ingredient.nom}"></td>
                                 <td th:text="${item.quantite}"></td>
                                 <td th:text="${item.unite}"></td>
                                 <td class="text-end">

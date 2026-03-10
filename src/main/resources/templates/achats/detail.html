@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Détails Achat - Belasyet</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/css/main.css" rel="stylesheet">
+    <style>
+        body { padding-top: 120px !important; }
+    </style>
+</head>
+<body>
+    <div th:replace="fragments/navbar :: navbar"></div>
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h2>Achat #[[${achat.id}]]</h2>
+                <div class="text-muted">
+                    <span th:text="${achat.fournisseur}"></span> ·
+                    <span th:text="${achat.dateAchat}"></span>
+                </div>
+            </div>
+            <a class="btn btn-outline-secondary" href="/achats">Retour</a>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="text-muted">Référence facture</div>
+                        <div th:text="${achat.referenceFacture}"></div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-muted">Total</div>
+                        <div class="fw-bold" th:text="${#numbers.formatDecimal(achat.total, 1, 2)}"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">Ajouter une ligne d'achat</div>
+            <div class="card-body">
+                <form th:action="@{/achats/{id}/lignes(id=${achat.id})}" method="post">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Ingrédient</label>
+                            <select class="form-select" name="ingredientId" id="ingredientSelect" required>
+                                <option value="">Sélectionner</option>
+                                <option th:each="ingredient : ${ingredients}" th:value="${ingredient.id}" th:text="${ingredient.nom}" th:data-unite="${ingredient.uniteStock}"></option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Quantité</label>
+                            <input type="number" step="0.01" min="0" class="form-control" name="quantite" required>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Prix unitaire</label>
+                            <input type="number" step="0.01" min="0" class="form-control" name="prixUnitaire" required>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Unité</label>
+                            <input type="text" class="form-control" id="uniteAffichee" readonly>
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary w-100">Ajouter</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">Lignes d'achat</div>
+            <div class="card-body">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Ingrédient</th>
+                            <th>Quantité</th>
+                            <th>Unité</th>
+                            <th>Prix unitaire</th>
+                            <th>Sous-total</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="ligne : ${lignes}">
+                            <td th:text="${ligne.ingredient.nom}"></td>
+                            <td th:text="${ligne.quantite}"></td>
+                            <td th:text="${ligne.unite}"></td>
+                            <td th:text="${#numbers.formatDecimal(ligne.prixUnitaire, 1, 2)}"></td>
+                            <td th:text="${#numbers.formatDecimal(ligne.sousTotal, 1, 2)}"></td>
+                            <td class="text-end">
+                                <a class="btn btn-sm btn-outline-danger" th:href="@{/achats/{id}/lignes/{ligneId}/delete(id=${achat.id}, ligneId=${ligne.id})}" onclick="return confirm('Supprimer cette ligne ?')">Supprimer</a>
+                            </td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(lignes)}">
+                            <td colspan="6" class="text-center text-muted">Aucune ligne enregistrée.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const ingredientSelect = document.getElementById('ingredientSelect');
+        const uniteAffichee = document.getElementById('uniteAffichee');
+        if (ingredientSelect && uniteAffichee) {
+            const updateUnite = () => {
+                const selected = ingredientSelect.options[ingredientSelect.selectedIndex];
+                uniteAffichee.value = selected ? (selected.dataset.unite || '') : '';
+            };
+            ingredientSelect.addEventListener('change', updateUnite);
+            updateUnite();
+        }
+    </script>
+</body>
+</html>

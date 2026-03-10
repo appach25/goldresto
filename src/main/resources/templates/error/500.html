@@ -17,8 +17,22 @@
                     <i class="bi bi-x-circle-fill display-1"></i>
                     <h2 class="mt-3">Erreur serveur</h2>
                     <p class="lead">Une erreur interne s'est produite sur le serveur.</p>
-                    <p th:if="${error}" th:text="${error}" class="text-danger"></p>
-                    <p>Notre équipe technique a été notifiée. Veuillez réessayer plus tard.</p>
+                    <div class="text-start mt-3" th:if="${errorMessage}">
+                        <p class="mb-1"><strong>Message:</strong></p>
+                        <pre class="bg-light p-2 border rounded" th:text="${errorMessage}"></pre>
+                    </div>
+                    <div class="text-start mt-3" th:if="${exceptionType}">
+                        <p class="mb-1"><strong>Exception:</strong></p>
+                        <pre class="bg-light p-2 border rounded" th:text="${exceptionType}"></pre>
+                    </div>
+                    <div class="text-start mt-3" th:if="${exceptionMessage}">
+                        <p class="mb-1"><strong>Détail:</strong></p>
+                        <pre class="bg-light p-2 border rounded" th:text="${exceptionMessage}"></pre>
+                    </div>
+                    <div class="text-start mt-3" th:if="${exceptionTrace}">
+                        <p class="mb-1"><strong>Trace:</strong></p>
+                        <pre class="bg-light p-2 border rounded" style="max-height: 240px; overflow: auto;" th:text="${exceptionTrace}"></pre>
+                    </div>
                     <hr>
                     <div class="d-flex justify-content-center gap-2">
                         <button onclick="history.back()" class="btn btn-secondary">Retour</button>
