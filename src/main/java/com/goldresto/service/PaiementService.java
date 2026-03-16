@@ -1,6 +1,7 @@
 package com.goldresto.service;
 
 import com.goldresto.entity.Paiement;
+import com.goldresto.entity.LignedeProduit;
 import com.goldresto.entity.User;
 import com.goldresto.repository.PaiementRepository;
 import com.goldresto.dto.UserPaymentSummary;
@@ -21,6 +22,9 @@ public class PaiementService {
 
     @Autowired
     private PaiementRepository paiementRepository;
+
+    @Autowired
+    private IngredientStockService ingredientStockService;
 
     private List<Paiement> getDetailedPayments(Long userId, LocalDateTime startDate, LocalDateTime endDate) {
         return paiementRepository.findByUserIdAndDateCreationBetween(userId, startDate, endDate);
@@ -55,13 +59,38 @@ public class PaiementService {
 
     @Transactional
     public Paiement save(Paiement paiement) {
+        logger.info("Saving payment for panier {}", paiement.getPanier() != null ? paiement.getPanier().getId() : "null");
         if (paiement.getPanier() != null && paiement.getPanier().getUser() != null) {
             paiement.setUser(paiement.getPanier().getUser());
             logger.debug("Setting user {} for payment {}", paiement.getUser().getFullName(), paiement.getId());
         } else {
             logger.warn("No user found for payment {}", paiement.getId());
         }
-        return paiementRepository.save(paiement);
+        Paiement saved = paiementRepository.save(paiement);
+        logger.info("Payment {} saved, processing stock updates", saved.getId());
+
+        // Decrease ingredient stock for each product sold
+        if (saved.getPanier() != null && saved.getPanier().getLignesProduits() != null) {
+            logger.debug("Processing {} lines for panier {}", saved.getPanier().getLignesProduits().size(), saved.getPanier().getId());
+            for (LignedeProduit ligne : saved.getPanier().getLignesProduits()) {
+                if (ligne.getProduit() != null) {
+                    logger.debug("Product: {}, noRecipe: {}, quantity: {}", 
+                        ligne.getProduit().getNomProduit(), 
+                        ligne.getProduit().isNoRecipe(), 
+                        ligne.getQuantite());
+                    if (!ligne.getProduit().isNoRecipe()) {
+                        logger.info("Decreasing ingredient stock for product: {} x{}", ligne.getProduit().getNomProduit(), ligne.getQuantite());
+                        ingredientStockService.decreaseStockOnProductSale(ligne.getProduit().getId(), ligne.getQuantite());
+                    } else {
+                        logger.info("Skipping stock decrease for noRecipe product: {}", ligne.getProduit().getNomProduit());
+                    }
+                }
+            }
+        } else {
+            logger.warn("Panier or its lignesProduits is null for payment {}", saved.getId());
+        }
+
+        return saved;
     }
 
     public Map<String, Object> getUserPaymentsReport(LocalDateTime startDate, LocalDateTime endDate, Long userId) {

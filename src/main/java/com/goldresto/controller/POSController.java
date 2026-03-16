@@ -7,6 +7,7 @@ import com.goldresto.entity.*;
 import com.goldresto.repository.*;
 import com.goldresto.service.StockService;
 import com.goldresto.service.PanierService;
+import com.goldresto.service.PaiementService;
 import com.goldresto.service.PrinterService;
 import com.goldresto.dto.PanierCreateDTO;
 import org.slf4j.Logger;
@@ -43,6 +44,9 @@ public class POSController {
 
     @Autowired
     private PaiementRepository paiementRepository;
+
+    @Autowired
+    private PaiementService paiementService;
 
     @Autowired
     private JournalRepository journalRepository;
@@ -335,6 +339,9 @@ public class POSController {
     public ResponseEntity<?> processPaiement(@PathVariable Long panierId,
                                              @RequestBody Paiement paiement,
                                              @RequestParam(name = "print", defaultValue = "true") boolean printBill) {
+        System.out.println("=== PAYMENT REQUEST RECEIVED for panier " + panierId + " ===");
+        logger.info("=== PAYMENT REQUEST RECEIVED for panier {} ===", panierId);
+        try {
         Panier panier = panierRepository.findByIdWithLignes(panierId)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid panier ID"));
         
@@ -346,7 +353,7 @@ public class POSController {
         if (paiement.getCashRecu() != null) {
             paiement.setMonnaie(paiement.getCashRecu().subtract(panier.getTotal()));
         }
-        Paiement savedPaiement = paiementRepository.save(paiement);
+        Paiement savedPaiement = paiementService.save(paiement);
 
         // Print client bill (optional)
         if (printBill) {
@@ -376,6 +383,11 @@ public class POSController {
         journalRepository.save(journal);
 
         return ResponseEntity.ok(savedPaiement);
+        } catch (Exception e) {
+            logger.error("Error processing payment for panier " + panierId, e);
+            System.out.println("=== PAYMENT ERROR for panier " + panierId + ": " + e.getMessage() + " ===");
+            return ResponseEntity.badRequest().body("Payment failed: " + e.getMessage());
+        }
     }
 
     // Endpoint to clear all products from a panier (for editing)

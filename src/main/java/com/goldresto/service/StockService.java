@@ -8,6 +8,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+
 @Service
 public class StockService {
     @Autowired
@@ -27,8 +29,8 @@ public class StockService {
 
         StockHistory history = new StockHistory();
         history.setProduit(produit);
-        history.setQuantityChanged(-quantity);
-        history.setStockAfterChange(produit.getStock().intValue());
+        history.setQuantityChanged(BigDecimal.valueOf(-quantity));
+        history.setStockAfterChange(BigDecimal.valueOf(produit.getStock()));
         history.setType("SALE");
         history.setReason("Sale through POS");
         stockHistoryRepository.save(history);
@@ -44,8 +46,8 @@ public class StockService {
 
         StockHistory history = new StockHistory();
         history.setProduit(produit);
-        history.setQuantityChanged(quantity);
-        history.setStockAfterChange(produit.getStock().intValue());
+        history.setQuantityChanged(BigDecimal.valueOf(quantity));
+        history.setStockAfterChange(BigDecimal.valueOf(produit.getStock()));
         history.setType("RESTOCK");
         history.setReason(reason);
         stockHistoryRepository.save(history);

@@ -6,6 +6,7 @@ import com.goldresto.entity.LigneAchat;
 import com.goldresto.repository.AchatRepository;
 import com.goldresto.repository.IngredientRepository;
 import com.goldresto.repository.LigneAchatRepository;
+import com.goldresto.service.IngredientStockService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -27,6 +28,9 @@ public class AchatController {
 
     @Autowired
     private LigneAchatRepository ligneAchatRepository;
+
+    @Autowired
+    private IngredientStockService ingredientStockService;
 
     @GetMapping
     public String list(Model model) {
@@ -83,6 +87,7 @@ public class AchatController {
 
         achat.getLignes().add(ligne);
         ligneAchatRepository.save(ligne);
+        ingredientStockService.increaseStockOnAchat(ingredient.getId(), quantite);
         achat.updateTotal();
         achatRepository.save(achat);
         return "redirect:/achats/" + id;

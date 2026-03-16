@@ -1,6 +1,7 @@
 package com.goldresto.entity;
 
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -10,12 +11,16 @@ public class StockHistory {
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name = "produit_id", nullable = false)
+    @JoinColumn(name = "produit_id", nullable = true)
     private Produit produit;
 
-    private Integer quantityChanged;
-    private Integer stockAfterChange;
-    private String type; // "SALE", "RESTOCK", "ADJUSTMENT"
+    @ManyToOne
+    @JoinColumn(name = "ingredient_id", nullable = true)
+    private Ingredient ingredient;
+
+    private BigDecimal quantityChanged;
+    private BigDecimal stockAfterChange;
+    private String type; // "SALE", "ACHAT", "RESTOCK", "ADJUSTMENT"
     private String reason;
     private LocalDateTime timestamp;
 
@@ -41,19 +46,27 @@ public class StockHistory {
         this.produit = produit;
     }
 
-    public Integer getQuantityChanged() {
+    public Ingredient getIngredient() {
+        return ingredient;
+    }
+
+    public void setIngredient(Ingredient ingredient) {
+        this.ingredient = ingredient;
+    }
+
+    public BigDecimal getQuantityChanged() {
         return quantityChanged;
     }
 
-    public void setQuantityChanged(Integer quantityChanged) {
+    public void setQuantityChanged(BigDecimal quantityChanged) {
         this.quantityChanged = quantityChanged;
     }
 
-    public Integer getStockAfterChange() {
+    public BigDecimal getStockAfterChange() {
         return stockAfterChange;
     }
 
-    public void setStockAfterChange(Integer stockAfterChange) {
+    public void setStockAfterChange(BigDecimal stockAfterChange) {
         this.stockAfterChange = stockAfterChange;
     }
 
