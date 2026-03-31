@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Test Ultra Minimal</title>
+</head>
+<body>
+    <h1>Test Clients</h1>
+    
+    <!-- Test 1: Vérifier si clients existe -->
+    <div th:if="${clients != null}">
+        <p>Clients existe: <span th:text="${clients.size()}">0</span></p>
+        
+        <!-- Test 2: Boucle simple -->
+        <div th:each="client : ${clients}">
+            <p>Client ID: <span th:text="${client.id}">1</span></p>
+        </div>
+    </div>
+    
+    <div th:if="${clients == null}">
+        <p>Clients est NULL!</p>
+    </div>
+    
+</body>
+</html>

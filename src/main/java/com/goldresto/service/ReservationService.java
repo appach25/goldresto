@@ -5,9 +5,9 @@ import com.goldresto.entity.Reservation;
 import com.goldresto.entity.User;
 import com.goldresto.repository.ProduitRepository;
 import com.goldresto.repository.ReservationRepository;
+import com.goldresto.service.NotificationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,17 +15,23 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Service
+@Transactional
 public class ReservationService {
     
     private static final Logger logger = LoggerFactory.getLogger(ReservationService.class);
     
-    @Autowired
-    private ReservationRepository reservationRepository;
+    private final ReservationRepository reservationRepository;
+    private final ProduitRepository produitRepository;
+    private final NotificationService notificationService;
     
-    @Autowired
-    private ProduitRepository produitRepository;
+    public ReservationService(ReservationRepository reservationRepository, 
+                             ProduitRepository produitRepository,
+                             NotificationService notificationService) {
+        this.reservationRepository = reservationRepository;
+        this.produitRepository = produitRepository;
+        this.notificationService = notificationService;
+    }
     
-    @Transactional
     public Reservation createReservation(Long produitId, Integer quantite, 
                                        LocalDate dateReservation, User user, String notes) {
         logger.info("Creating reservation for produit {} quantity {} date {}", produitId, quantite, dateReservation);
@@ -50,24 +56,32 @@ public class ReservationService {
         reservation.setNotes(notes);
         reservation.setStatus(Reservation.ReservationStatus.EN_ATTENTE);
         
-        return reservationRepository.save(reservation);
+        Reservation savedReservation = reservationRepository.save(reservation);
+        logger.info("Reservation created: {} x {} for {}", 
+                   reservation.getQuantite(), reservation.getProduit().getNomProduit(), reservation.getDateReservation());
+        
+        return savedReservation;
     }
     
-    @Transactional
     public Reservation confirmReservation(Long reservationId) {
         Reservation reservation = reservationRepository.findById(reservationId)
             .orElseThrow(() -> new IllegalArgumentException("Réservation non trouvée: " + reservationId));
-            
+        
         if (reservation.getStatus() != Reservation.ReservationStatus.EN_ATTENTE) {
             throw new IllegalStateException("Seule une réservation en attente peut être confirmée");
         }
         
+        Reservation.ReservationStatus ancienStatut = reservation.getStatus();
         reservation.setStatus(Reservation.ReservationStatus.CONFIRMEE);
+        Reservation savedReservation = reservationRepository.save(reservation);
+        
+        // Créer une notification de changement de statut
+        notificationService.creerNotificationChangementStatut(reservation, ancienStatut, Reservation.ReservationStatus.CONFIRMEE);
+        
         logger.info("Reservation {} confirmed", reservationId);
-        return reservationRepository.save(reservation);
+        return savedReservation;
     }
     
-    @Transactional
     public Reservation cancelReservation(Long reservationId) {
         Reservation reservation = reservationRepository.findById(reservationId)
             .orElseThrow(() -> new IllegalArgumentException("Réservation non trouvée: " + reservationId));
@@ -76,12 +90,17 @@ public class ReservationService {
             throw new IllegalStateException("Réservation déjà annulée");
         }
         
+        Reservation.ReservationStatus ancienStatut = reservation.getStatus();
         reservation.setStatus(Reservation.ReservationStatus.ANNULEE);
+        Reservation savedReservation = reservationRepository.save(reservation);
+        
+        // Créer une notification de changement de statut
+        notificationService.creerNotificationChangementStatut(reservation, ancienStatut, Reservation.ReservationStatus.ANNULEE);
+        
         logger.info("Reservation {} cancelled", reservationId);
-        return reservationRepository.save(reservation);
+        return savedReservation;
     }
     
-    @Transactional
     public Reservation completeReservation(Long reservationId) {
         Reservation reservation = reservationRepository.findById(reservationId)
             .orElseThrow(() -> new IllegalArgumentException("Réservation non trouvée: " + reservationId));
@@ -90,9 +109,15 @@ public class ReservationService {
             throw new IllegalStateException("Seule une réservation confirmée peut être terminée");
         }
         
+        Reservation.ReservationStatus ancienStatut = reservation.getStatus();
         reservation.setStatus(Reservation.ReservationStatus.TERMINEE);
+        Reservation savedReservation = reservationRepository.save(reservation);
+        
+        // Créer une notification de changement de statut
+        notificationService.creerNotificationChangementStatut(reservation, ancienStatut, Reservation.ReservationStatus.TERMINEE);
+        
         logger.info("Reservation {} completed", reservationId);
-        return reservationRepository.save(reservation);
+        return savedReservation;
     }
     
     public List<Reservation> getReservationsByDate(LocalDate date) {

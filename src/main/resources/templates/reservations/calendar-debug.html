@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Calendrier des réservations - Belasyet</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    <link href="/css/main.css" rel="stylesheet">
+    <style>
+        .calendar-day {
+            min-height: 100px;
+            border: 1px solid #dee2e6;
+            position: relative;
+        }
+        .calendar-day:hover {
+            background-color: #f8f9fa;
+        }
+        .day-number {
+            font-weight: bold;
+            color: #495057;
+        }
+        .reservation-item {
+            font-size: 0.8rem;
+            padding: 2px 4px;
+            margin: 1px;
+            border-radius: 3px;
+            cursor: pointer;
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .other-month {
+            background-color: #f8f9fa;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div th:replace="~{fragments/navbar :: navbar}"></div>
+    
+    <div class="container-fluid mt-4 px-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>Calendrier des réservations</h2>
+            <div class="btn-group">
+                <a href="/reservations" class="btn btn-outline-secondary">
+                    <i class="bi bi-list"></i> Vue liste
+                </a>
+                <a href="/reservations/new" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Nouvelle réservation
+                </a>
+            </div>
+        </div>
+        
+        <!-- Debug Info -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>Debug Information</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Current Date:</strong> <span th:text="${currentDate}"></span></p>
+                <p><strong>Number of Reservations:</strong> <span th:text="${#lists.size(reservations)}"></span></p>
+                <div th:if="${!#lists.isEmpty(reservations)}">
+                    <p><strong>First Reservation:</strong></p>
+                    <pre th:text="${reservations[0]}"></pre>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Navigation du calendrier -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <button class="btn btn-outline-primary" onclick="changeMonth(-1)">
+                            <i class="bi bi-chevron-left"></i>
+                        </button>
+                    </div>
+                    <div class="col text-center">
+                        <h4 id="currentMonth" th:text="${#temporals.format(currentDate, 'MMMM yyyy')}"></h4>
+                    </div>
+                    <div class="col-auto">
+                        <button class="btn btn-outline-primary" onclick="changeMonth(1)">
+                            <i class="bi bi-chevron-right"></i>
+                        </button>
+                    </div>
+                    <div class="col-auto">
+                        <button class="btn btn-outline-secondary" onclick="goToToday()">Aujourd'hui</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Grille du calendrier -->
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="text-center">Dim</th>
+                                <th class="text-center">Lun</th>
+                                <th class="text-center">Mar</th>
+                                <th class="text-center">Mer</th>
+                                <th class="text-center">Jeu</th>
+                                <th class="text-center">Ven</th>
+                                <th class="text-center">Sam</th>
+                            </tr>
+                        </thead>
+                        <tbody id="calendarBody">
+                            <!-- Le calendrier sera généré par JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Données simplifiées des réservations
+        const reservations = [
+            /*[# th:each="r : ${reservations}"]*/
+            {
+                id: /*[[${r.id}]]*/ 0,
+                produit: { nomProduit: /*[[${r.produit.nomProduit}]]*/ '' },
+                quantite: /*[[${r.quantite}]]*/ 0,
+                dateReservation: /*[[${r.dateReservation}]]*/ '',
+                status: /*[[${r.status}]]*/ ''
+            },
+            /*[/]*/
+        ];
+        
+        console.log('Réservations:', reservations);
+        
+        let currentDate = new Date(/*[[${currentDate.year}]]*/, /*[[${currentDate.monthValue - 1}]]*/, /*[[${currentDate.dayOfMonth}]]*/);
+        
+        function generateCalendar(year, month) {
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const prevLastDay = new Date(year, month, 0);
+            const startDate = firstDay.getDay();
+            const endDate = lastDay.getDate();
+            const prevEndDate = prevLastDay.getDate();
+            
+            let html = '';
+            let day = 1;
+            
+            // Générer les semaines
+            for (let week = 0; week < 6; week++) {
+                html += '<tr>';
+                
+                for (let weekday = 0; weekday < 7; weekday++) {
+                    let cellDate, isCurrentMonth = true;
+                    
+                    if (week === 0 && weekday < startDate) {
+                        // Jours du mois précédent
+                        cellDate = prevEndDate - startDate + weekday + 1;
+                        isCurrentMonth = false;
+                    } else if (day > endDate) {
+                        // Jours du mois suivant
+                        cellDate = day - endDate;
+                        day++;
+                        isCurrentMonth = false;
+                    } else {
+                        // Jours du mois courant
+                        cellDate = day;
+                        day++;
+                    }
+                    
+                    const dateStr = isCurrentMonth ? 
+                        year + '-' + String(month + 1).padStart(2, '0') + '-' + String(cellDate).padStart(2, '0') : 
+                        null;
+                    
+                    const dayReservations = dateStr ? 
+                        reservations.filter(r => r.dateReservation === dateStr) : [];
+                    
+                    html += '<td class="calendar-day ' + (!isCurrentMonth ? 'other-month' : '') + '" data-date="' + dateStr + '">' +
+                        '<div class="day-number">' + cellDate + '</div>';
+                    
+                    if (dayReservations.length > 0) {
+                        dayReservations.slice(0, 3).forEach(reservation => {
+                            html += '<div class="reservation-item" title="' + reservation.produit.nomProduit + ' - ' + reservation.quantite + '">' +
+                                reservation.produit.nomProduit + ' (' + reservation.quantite + ')' +
+                            '</div>';
+                        });
+                        
+                        if (dayReservations.length > 3) {
+                            html += '<div class="text-muted small">+' + (dayReservations.length - 3) + ' plus</div>';
+                        }
+                    }
+                    
+                    html += '</td>';
+                }
+                
+                html += '</tr>';
+                
+                if (day > endDate && week >= 4) {
+                    break;
+                }
+            }
+            
+            document.getElementById('calendarBody').innerHTML = html;
+        }
+        
+        function changeMonth(direction) {
+            currentDate.setMonth(currentDate.getMonth() + direction);
+            updateCalendar();
+        }
+        
+        function goToToday() {
+            currentDate = new Date();
+            updateCalendar();
+        }
+        
+        function updateCalendar() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            
+            document.getElementById('currentMonth').textContent = 
+                new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' }).format(currentDate);
+            
+            generateCalendar(year, month);
+        }
+        
+        // Initialiser le calendrier au chargement
+        document.addEventListener('DOMContentLoaded', function() {
+            updateCalendar();
+        });
+    </script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

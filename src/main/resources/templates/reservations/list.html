@@ -76,6 +76,7 @@
                                 <tr>
                                     <th>Produit</th>
                                     <th>Quantité</th>
+                                    <th>Date</th>
                                     <th>Client</th>
                                     <th>Statut</th>
                                     <th>Notes</th>
@@ -89,6 +90,11 @@
                                     </td>
                                     <td>
                                         <span th:text="${reservation.quantite}"></span>
+                                    </td>
+                                    <td>
+                                        <span th:if="${reservation.dateReservation}" 
+                                              th:text="${#temporals.format(reservation.dateReservation, 'dd/MM/yyyy')}"></span>
+                                        <span th:unless="${reservation.dateReservation}" class="text-muted">-</span>
                                     </td>
                                     <td>
                                         <span th:if="${reservation.user}" th:text="${reservation.user.fullName}"></span>

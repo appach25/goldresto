@@ -18,6 +18,10 @@ public class Reservation {
     @JoinColumn(name = "user_id")
     private User user;
 
+    @ManyToOne
+    @JoinColumn(name = "client_id")
+    private Client client;
+
     private Integer quantite;
 
     private LocalDate dateReservation;
@@ -32,10 +36,20 @@ public class Reservation {
     private LocalDateTime createdAt;
 
     public enum ReservationStatus {
-        EN_ATTENTE,
-        CONFIRMEE,
-        ANNULEE,
-        TERMINEE
+        EN_ATTENTE("En attente"),
+        CONFIRMEE("Confirmée"),
+        ANNULEE("Annulée"),
+        TERMINEE("Terminée");
+        
+        private final String libelle;
+        
+        ReservationStatus(String libelle) {
+            this.libelle = libelle;
+        }
+        
+        public String getLibelle() {
+            return libelle;
+        }
     }
 
     @PrePersist
@@ -69,6 +83,14 @@ public class Reservation {
 
     public void setUser(User user) {
         this.user = user;
+    }
+
+    public Client getClient() {
+        return client;
+    }
+
+    public void setClient(Client client) {
+        this.client = client;
     }
 
     public Integer getQuantite() {

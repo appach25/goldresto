@@ -22,7 +22,7 @@ import java.util.List;
 
 @Controller
 @RequestMapping("/reservations")
-@PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'EMPLOYEE')")
+@PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'EMPLOYEE', 'OWNER')")
 public class ReservationController {
     
     private static final Logger logger = LoggerFactory.getLogger(ReservationController.class);
