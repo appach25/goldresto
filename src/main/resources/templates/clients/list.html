@@ -106,6 +106,9 @@
                                         <a th:href="@{/clients/{id}/edit(id=${client.id})}" class="btn btn-outline-warning" title="Modifier" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'OWNER')">
                                             <i class="bi bi-pencil"></i>
                                         </a>
+                                        <a th:href="@{/reservations?search=client&clientId=${client.id}}" class="btn btn-outline-info" title="Voir les réservations">
+                                            <i class="bi bi-calendar-check"></i>
+                                        </a>
                                         <form th:action="@{/clients/{id}/toggle-status(id=${client.id})}" method="post" 
                                               class="d-inline" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'OWNER')"
                                               onsubmit="return confirm('Êtes-vous sûr de vouloir changer le statut de ce client ?')">

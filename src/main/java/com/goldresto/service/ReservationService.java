@@ -63,6 +63,41 @@ public class ReservationService {
         return savedReservation;
     }
     
+    public Reservation createReservation(Long produitId, Integer quantite, 
+                                       LocalDate dateReservation, User user, String notes, com.goldresto.entity.Client client) {
+        logger.info("Creating reservation for produit {} quantity {} date {} with client {}", produitId, quantite, dateReservation, client != null ? client.getNomComplet() : "null");
+        
+        Produit produit = produitRepository.findById(produitId)
+            .orElseThrow(() -> new IllegalArgumentException("Produit non trouvé: " + produitId));
+            
+        // Vérifier si le stock disponible est suffisant
+        Integer reserveActuel = reservationRepository.sumQuantiteByProduitAndDate(produitId, dateReservation);
+        Integer stockDisponible = produit.getStock() != null ? produit.getStock().intValue() : 0;
+        
+        if (stockDisponible < quantite) {
+            throw new IllegalStateException("Stock insuffisant pour réserver. Disponible: " + stockDisponible + ", Demandé: " + quantite);
+        }
+        
+        Reservation reservation = new Reservation();
+        reservation.setProduit(produit);
+        reservation.setUser(user);
+        reservation.setClient(client);
+        reservation.setQuantite(quantite);
+        reservation.setDateReservation(dateReservation);
+        reservation.setDateLimite(dateReservation.minusDays(1)); // J-1 pour annuler
+        reservation.setNotes(notes);
+        reservation.setStatus(Reservation.ReservationStatus.EN_ATTENTE);
+        
+        Reservation savedReservation = reservationRepository.save(reservation);
+        logger.info("Reservation created with client: {} x {} for {} by {}", 
+                   reservation.getQuantite(), 
+                   reservation.getProduit().getNomProduit(), 
+                   reservation.getDateReservation(),
+                   client != null ? client.getNomComplet() : "NO CLIENT");
+        
+        return savedReservation;
+    }
+    
     public Reservation confirmReservation(Long reservationId) {
         Reservation reservation = reservationRepository.findById(reservationId)
             .orElseThrow(() -> new IllegalArgumentException("Réservation non trouvée: " + reservationId));
@@ -118,6 +153,10 @@ public class ReservationService {
         
         logger.info("Reservation {} completed", reservationId);
         return savedReservation;
+    }
+    
+    public List<Reservation> getAllReservations() {
+        return reservationRepository.findAll();
     }
     
     public List<Reservation> getReservationsByDate(LocalDate date) {

@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Nouvelle réservation - Belasyet</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    <link href="/css/main.css" rel="stylesheet">
+</head>
+<body>
+    <div th:replace="~{fragments/navbar :: navbar}"></div>
+    
+    <div class="container-fluid mt-4 px-4">
+        <div class="row justify-content-center">
+            <div class="col-md-10">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-calendar-plus me-2"></i>
+                            Nouvelle réservation
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form th:action="@{/reservations}" th:object="${reservation}" method="post" id="reservationForm">
+                            
+                            <!-- Client Section -->
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h6 class="mb-0">
+                                        <i class="bi bi-person me-2"></i>
+                                        Informations Client
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row mb-3">
+                                        <div class="col-md-6">
+                                            <label for="telephoneSearch" class="form-label">Numéro de téléphone *</label>
+                                            <div class="input-group">
+                                                <input type="tel" id="telephoneSearch" class="form-control" 
+                                                       placeholder="06 12 34 56 78" required>
+                                                <button type="button" class="btn btn-outline-primary" onclick="searchClient()">
+                                                    <i class="bi bi-search"></i> Rechercher
+                                                </button>
+                                            </div>
+                                            <div class="form-text">Entrez le numéro de téléphone pour retrouver le client</div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div id="clientInfo" class="d-none">
+                                                <div class="alert alert-success">
+                                                    <i class="bi bi-check-circle me-2"></i>
+                                                    <strong>Client trouvé :</strong>
+                                                    <span id="clientName"></span>
+                                                </div>
+                                                <input type="hidden" id="selectedClientId" name="clientId">
+                                            </div>
+                                            <div id="clientNotFound" class="d-none">
+                                                <div class="alert alert-warning">
+                                                    <i class="bi bi-exclamation-triangle me-2"></i>
+                                                    Client non trouvé. Voulez-vous en créer un nouveau ?
+                                                    <button type="button" class="btn btn-success btn-sm ms-2" onclick="showNewClientForm()">
+                                                        <i class="bi bi-plus-circle"></i> Nouveau client
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- New Client Form (Hidden by default) -->
+                                    <div id="newClientForm" class="d-none">
+                                        <div class="border rounded p-3 bg-light">
+                                            <h6 class="mb-3">
+                                                <i class="bi bi-person-plus me-2"></i>
+                                                Nouveau Client
+                                            </h6>
+                                            <div class="row">
+                                                <div class="col-md-6 mb-3">
+                                                    <label for="newClientNom" class="form-label">Nom *</label>
+                                                    <input type="text" id="newClientNom" class="form-control" required>
+                                                </div>
+                                                <div class="col-md-6 mb-3">
+                                                    <label for="newClientPrenom" class="form-label">Prénom *</label>
+                                                    <input type="text" id="newClientPrenom" class="form-control" required>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-md-6 mb-3">
+                                                    <label for="newClientEmail" class="form-label">Email</label>
+                                                    <input type="email" id="newClientEmail" class="form-control">
+                                                </div>
+                                                <div class="col-md-6 mb-3">
+                                                    <label for="newClientVille" class="form-label">Ville</label>
+                                                    <input type="text" id="newClientVille" class="form-control">
+                                                </div>
+                                            </div>
+                                            <div class="d-flex justify-content-end">
+                                                <button type="button" class="btn btn-outline-secondary me-2" onclick="hideNewClientForm()">
+                                                    Annuler
+                                                </button>
+                                                <button type="button" class="btn btn-success" onclick="createNewClient()">
+                                                    <i class="bi bi-plus-circle"></i> Créer le client
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Reservation Section -->
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h6 class="mb-0">
+                                        <i class="bi bi-box me-2"></i>
+                                        Détails de la réservation
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row mb-3">
+                                        <div class="col-md-6">
+                                            <label for="produitId" class="form-label">Produit *</label>
+                                            <select id="produitId" name="produitId" class="form-select" required>
+                                                <option value="">Sélectionner un produit</option>
+                                                <option th:each="produit : ${produits}" 
+                                                        th:value="${produit.id}"
+                                                        th:text="${produit.nomProduit} + ' (Stock: ' + ${produit.stock} + ')'">
+                                                </option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="quantite" class="form-label">Quantité *</label>
+                                            <input type="number" id="quantite" th:field="*{quantite}" 
+                                                   class="form-control" min="1" required>
+                                            <div id="stockInfo" class="form-text text-muted"></div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="row mb-3">
+                                        <div class="col-md-6">
+                                            <label for="dateReservation" class="form-label">Date de réservation *</label>
+                                            <input type="date" id="dateReservation" th:field="*{dateReservation}" 
+                                                   class="form-control" th:min="${today}" required>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="dateLimite" class="form-label">Date limite</label>
+                                            <input type="date" id="dateLimite" th:field="*{dateLimite}" 
+                                                   class="form-control" readonly>
+                                            <div class="form-text">Automatiquement J-1</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="notes" class="form-label">Notes</label>
+                                        <textarea id="notes" th:field="*{notes}" class="form-control" rows="3" 
+                                                  placeholder="Notes optionnelles..."></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Availability Alert -->
+                            <div id="availabilityAlert" class="alert alert-warning d-none" role="alert">
+                                <i class="bi bi-exclamation-triangle me-2"></i>
+                                <span id="availabilityMessage"></span>
+                            </div>
+                            
+                            <!-- Submit Buttons -->
+                            <div class="d-flex justify-content-between">
+                                <a href="/reservations" class="btn btn-outline-secondary">
+                                    <i class="bi bi-arrow-left"></i> Retour
+                                </a>
+                                <div>
+                                    <button type="button" class="btn btn-danger btn-sm me-2" onclick="testAlert()">
+                                        <i class="bi bi-bug"></i> Test JS
+                                    </button>
+                                    <button type="button" class="btn btn-warning btn-sm me-2" onclick="debugForm()">
+                                        <i class="bi bi-bug"></i> Debug
+                                    </button>
+                                    <button type="button" class="btn btn-info btn-sm me-2" onclick="testSubmission()">
+                                        <i class="bi bi-play"></i> Test
+                                    </button>
+                                    <button type="button" class="btn btn-success btn-sm me-2" onclick="directSubmit()">
+                                        <i class="bi bi-check-circle"></i> Créer la réservation
+                                    </button>
+                                    <button type="button" class="btn btn-secondary btn-sm me-2" onclick="manualSubmit()">
+                                        <i class="bi bi-send"></i> Manual
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        console.log('=== SCRIPT LOADED ===');
+        
+        let selectedClient = null;
+        
+        // Simple test function
+        window.testAlert = function() {
+            console.log('Test alert function called');
+            alert('JavaScript is working!');
+        };
+        
+        // Test if elements exist
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('=== DOM CONTENT LOADED ===');
+            console.log('Form element:', document.getElementById('reservationForm'));
+            console.log('Debug button:', document.querySelector('button[onclick="debugForm()"]'));
+            console.log('Test button:', document.querySelector('button[onclick="testSubmission()"]'));
+            console.log('Submit button:', document.getElementById('submitBtn'));
+            
+            // Add click listeners manually as backup
+            const debugBtn = document.querySelector('button[onclick="debugForm()"]');
+            if (debugBtn) {
+                debugBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    console.log('Debug button clicked via event listener');
+                    debugForm();
+                });
+            }
+            
+            const testBtn = document.querySelector('button[onclick="testSubmission()"]');
+            if (testBtn) {
+                testBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    console.log('Test button clicked via event listener');
+                    testSubmission();
+                });
+            }
+        });
+        
+        // Search client by phone
+        function searchClient() {
+            const telephone = document.getElementById('telephoneSearch').value.trim();
+            
+            console.log('=== SEARCH CLIENT DEBUG ===');
+            console.log('Telephone searched:', telephone);
+            
+            if (!telephone) {
+                alert('Veuillez entrer un numéro de téléphone');
+                return;
+            }
+            
+            fetch(`/clients/search-by-phone?telephone=${encodeURIComponent(telephone)}`)
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Search response:', data);
+                    
+                    if (data.found) {
+                        // Client found
+                        selectedClient = data.client;
+                        console.log('=== CLIENT FOUND - SETTING UP FORM ===');
+                        console.log('Client object:', selectedClient);
+                        console.log('Client ID:', data.client.id);
+                        console.log('Client ID type:', typeof data.client.id);
+                        
+                        document.getElementById('clientInfo').classList.remove('d-none');
+                        document.getElementById('clientNotFound').classList.add('d-none');
+                        document.getElementById('newClientForm').classList.add('d-none');
+                        document.getElementById('clientName').textContent = data.client.nomComplet;
+                        
+                        // Set client ID with verification
+                        const clientIdElement = document.getElementById('selectedClientId');
+                        console.log('Client ID element before setting:', clientIdElement);
+                        console.log('Client ID element value before setting:', clientIdElement ? clientIdElement.value : 'ELEMENT NOT FOUND');
+                        
+                        clientIdElement.value = data.client.id;
+                        
+                        console.log('Client ID element after setting:', clientIdElement);
+                        console.log('Client ID element value after setting:', clientIdElement.value);
+                        console.log('Client ID element value type after setting:', typeof clientIdElement.value);
+                        
+                        // Verify it was set correctly
+                        const verification = document.getElementById('selectedClientId').value;
+                        console.log('Verification - clientId is now:', verification);
+                        console.log('Verification - clientId equals expected:', verification == data.client.id);
+                        console.log('Verification - clientId === expected:', verification === data.client.id);
+                        
+                        // Enable form validation
+                        checkFormValidity();
+                        console.log('=== CLIENT SETUP COMPLETE ===');
+                    } else {
+                        // Client not found
+                        selectedClient = null;
+                        console.log('Client not found');
+                        
+                        document.getElementById('clientInfo').classList.add('d-none');
+                        document.getElementById('clientNotFound').classList.remove('d-none');
+                        document.getElementById('newClientForm').classList.add('d-none');
+                        document.getElementById('selectedClientId').value = '';
+                        
+                        console.log('Client ID cleared');
+                        
+                        // Disable submit
+                        document.getElementById('submitBtn').disabled = true;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error searching client:', error);
+                    alert('Erreur lors de la recherche du client');
+                });
+        }
+        
+        // Show new client form
+        function showNewClientForm() {
+            document.getElementById('clientNotFound').classList.add('d-none');
+            document.getElementById('newClientForm').classList.remove('d-none');
+        }
+        
+        // Hide new client form
+        function hideNewClientForm() {
+            document.getElementById('newClientForm').classList.add('d-none');
+            document.getElementById('clientNotFound').classList.remove('d-none');
+        }
+        
+        // Create new client
+        function createNewClient() {
+            const telephone = document.getElementById('telephoneSearch').value.trim();
+            const nom = document.getElementById('newClientNom').value.trim();
+            const prenom = document.getElementById('newClientPrenom').value.trim();
+            const email = document.getElementById('newClientEmail').value.trim();
+            const ville = document.getElementById('newClientVille').value.trim();
+            
+            console.log('=== CREATE CLIENT DEBUG ===');
+            console.log('Telephone:', telephone);
+            console.log('Nom:', nom);
+            console.log('Prenom:', prenom);
+            console.log('Email:', email);
+            console.log('Ville:', ville);
+            
+            if (!nom || !prenom) {
+                alert('Veuillez remplir le nom et le prénom');
+                return;
+            }
+            
+            const clientData = {
+                nom: nom,
+                prenom: prenom,
+                telephone: telephone,
+                email: email || null,
+                ville: ville || null,
+                actif: true
+            };
+            
+            console.log('Client data to send:', clientData);
+            
+            fetch('/clients/create-ajax', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(clientData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Create client response:', data);
+                
+                if (data.success) {
+                    // Client created successfully
+                    selectedClient = data.client;
+                    console.log('Client created successfully:', selectedClient);
+                    
+                    document.getElementById('clientInfo').classList.remove('d-none');
+                    document.getElementById('clientNotFound').classList.add('d-none');
+                    document.getElementById('newClientForm').classList.add('d-none');
+                    document.getElementById('clientName').textContent = data.client.nomComplet;
+                    document.getElementById('selectedClientId').value = data.client.id;
+                    
+                    console.log('New client ID set to:', document.getElementById('selectedClientId').value);
+                    
+                    // Enable form validation
+                    checkFormValidity();
+                } else {
+                    console.error('Create client failed:', data.message);
+                    alert('Erreur lors de la création du client: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error creating client:', error);
+                alert('Erreur lors de la création du client');
+            });
+        }
+        
+        // Form submission handler with detailed logging
+        document.getElementById('reservationForm').addEventListener('submit', function(e) {
+            console.log('=== FORM SUBMISSION INTERCEPTED ===');
+            console.log('Event type:', e.type);
+            console.log('Form action:', this.action);
+            console.log('Form method:', this.method);
+            
+            // Get all form data
+            const formData = new FormData(this);
+            console.log('Form data before submission:');
+            for (let [key, value] of formData.entries()) {
+                console.log(`  ${key}: ${value}`);
+            }
+            
+            // Check critical fields with more details
+            const clientIdElement = document.getElementById('selectedClientId');
+            const clientIdValue = clientIdElement ? clientIdElement.value : 'ELEMENT NOT FOUND';
+            const selectedClientObj = selectedClient;
+            
+            console.log('=== DETAILED CLIENT CHECK ===');
+            console.log('selectedClient object:', selectedClientObj);
+            console.log('selectedClient element:', clientIdElement);
+            console.log('selectedClientId value:', clientIdValue);
+            console.log('selectedClientId value type:', typeof clientIdValue);
+            console.log('selectedClientId is empty string:', clientIdValue === '');
+            console.log('selectedClientId is null:', clientIdValue === null);
+            console.log('selectedClientId is undefined:', clientIdValue === undefined);
+            
+            // Check if client ID is actually set
+            if (!selectedClientObj) {
+                console.error('❌ NO CLIENT OBJECT - PREVENTING SUBMISSION');
+                console.error('selectedClient is null or undefined');
+                e.preventDefault();
+                alert('Veuillez rechercher et sélectionner un client avant de continuer');
+                return false;
+            }
+            
+            // Check if client ID field has a value
+            if (!clientIdValue || clientIdValue === '' || clientIdValue === 'null' || clientIdValue === 'undefined') {
+                console.error('❌ CLIENT ID FIELD NOT SET - PREVENTING SUBMISSION');
+                console.error('clientIdValue:', clientIdValue);
+                e.preventDefault();
+                alert('Client ID non défini. Veuillez rechercher le client à nouveau.');
+                return false;
+            }
+            
+            console.log('✅ All client checks passed!');
+            console.log('Client object exists:', !!selectedClientObj);
+            console.log('Client ID field value:', clientIdValue);
+            console.log('✅ Form validation passed, allowing submission...');
+            console.log('=== END FORM SUBMISSION INTERCEPT ===');
+            
+            // IMPORTANT: Don't prevent default - let it submit normally like "Direct"
+            // This will use form.submit() which we know works
+        });
+        
+        // Test submission function
+        function testSubmission() {
+            console.log('=== TEST SUBMISSION ===');
+            
+            const form = document.getElementById('reservationForm');
+            const formData = new FormData(form);
+            
+            console.log('Form data:');
+            for (let [key, value] of formData.entries()) {
+                console.log(`${key}: ${value}`);
+            }
+            
+            // Submit to test endpoint
+            fetch('/reservations/test-submit', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Test response:', data);
+                alert('Test submission response:\n' + JSON.stringify(data, null, 2));
+            })
+            .catch(error => {
+                console.error('Test submission error:', error);
+                alert('Error during test submission: ' + error);
+            });
+        }
+        
+        // Direct submit function - main reservation creation button
+        function directSubmit() {
+            try {
+                console.log('=== CRÉATION RÉSERVATION - DÉBUT ===');
+                
+                const form = document.getElementById('reservationForm');
+                if (!form) {
+                    console.error('❌ Formulaire non trouvé!');
+                    alert('Formulaire non trouvé!');
+                    return;
+                }
+                
+                console.log('Formulaire:', form);
+                console.log('Action:', form.action);
+                console.log('Méthode:', form.method);
+                
+                // Get all form data
+                const formData = new FormData(form);
+                console.log('Données du formulaire:');
+                for (let [key, value] of formData.entries()) {
+                    console.log(`  ${key}: ${value}`);
+                }
+                
+                // Check critical fields
+                const clientId = document.getElementById('selectedClientId').value;
+                const produitId = document.getElementById('produitId').value;
+                const quantite = document.getElementById('quantite').value;
+                const date = document.getElementById('dateReservation').value;
+                
+                console.log('Vérification des champs critiques:');
+                console.log('  clientId:', clientId);
+                console.log('  produitId:', produitId);
+                console.log('  quantite:', quantite);
+                console.log('  date:', date);
+                
+                // Validate fields
+                if (!clientId) {
+                    console.error('❌ Veuillez rechercher et sélectionner un client');
+                    alert('Veuillez rechercher et sélectionner un client avant de continuer');
+                    return;
+                }
+                
+                if (!produitId) {
+                    console.error('❌ Veuillez sélectionner un produit');
+                    alert('Veuillez sélectionner un produit');
+                    return;
+                }
+                
+                if (!quantite) {
+                    console.error('❌ Veuillez entrer une quantité');
+                    alert('Veuillez entrer une quantité');
+                    return;
+                }
+                
+                if (!date) {
+                    console.error('❌ Veuillez choisir une date');
+                    alert('Veuillez choisir une date de réservation');
+                    return;
+                }
+                
+                // Submit the form
+                console.log('✅ Validation réussie - Création de la réservation...');
+                console.log('=== CRÉATION RÉSERVATION - SOUMISSION ===');
+                form.submit();
+                
+                console.log('=== CRÉATION RÉSERVATION - FIN ===');
+                
+            } catch (error) {
+                console.error('❌ ERREUR lors de la création:', error);
+                alert('Erreur lors de la création de la réservation: ' + error.message);
+            }
+        }
+        
+        // Manual submit function - bypass all event handlers
+        function manualSubmit() {
+            try {
+                console.log('=== MANUAL SUBMIT START ===');
+                
+                const form = document.getElementById('reservationForm');
+                if (!form) {
+                    console.error('❌ Form not found!');
+                    alert('Form not found!');
+                    return;
+                }
+                
+                // Get form values
+                const produitId = document.getElementById('produitId').value;
+                const clientId = document.getElementById('selectedClientId').value;
+                const quantite = document.getElementById('quantite').value;
+                const dateReservation = document.getElementById('dateReservation').value;
+                const notes = document.getElementById('notes').value || '';
+                
+                console.log('Manual form data:');
+                console.log('  produitId:', produitId);
+                console.log('  clientId:', clientId);
+                console.log('  quantite:', quantite);
+                console.log('  dateReservation:', dateReservation);
+                console.log('  notes:', notes);
+                
+                // Create URL-encoded parameters (like normal form submission)
+                const params = new URLSearchParams();
+                params.append('produitId', produitId);
+                params.append('clientId', clientId);
+                params.append('quantite', quantite);
+                params.append('dateReservation', dateReservation);
+                params.append('notes', notes);
+                
+                console.log('URLSearchParams:', params.toString());
+                
+                // Submit using fetch with URL-encoded data
+                fetch('/reservations', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: params.toString(),
+                    redirect: 'follow'  // Important: follow redirects
+                })
+                .then(response => {
+                    console.log('Manual submit response:', response);
+                    console.log('Response status:', response.status);
+                    console.log('Response headers:', [...response.headers.entries()]);
+                    
+                    if (response.redirected) {
+                        console.log('Redirected to:', response.url);
+                        window.location.href = response.url;
+                    } else if (response.ok) {
+                        console.log('Submit successful');
+                        window.location.href = '/reservations';
+                    } else {
+                        console.error('Submit failed:', response.status);
+                        response.text().then(text => {
+                            console.error('Error response:', text);
+                            alert('Submit failed: ' + response.status + ' - ' + text);
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Manual submit error:', error);
+                    alert('Manual submit error: ' + error.message);
+                });
+                
+                console.log('=== MANUAL SUBMIT END ===');
+                
+            } catch (error) {
+                console.error('❌ ERROR in manualSubmit:', error);
+                alert('Error in manual submit: ' + error.message);
+            }
+        }
+        
+        // Force submit function
+        function forceSubmit() {
+            try {
+                console.log('=== FORCE SUBMIT START ===');
+                
+                const form = document.getElementById('reservationForm');
+                if (!form) {
+                    console.error('❌ Form not found!');
+                    alert('Form not found!');
+                    return;
+                }
+                
+                // Get all form data
+                const formData = new FormData(form);
+                console.log('Form data before force submit:');
+                for (let [key, value] of formData.entries()) {
+                    console.log(`  ${key}: ${value}`);
+                }
+                
+                // Check critical fields
+                const clientId = document.getElementById('selectedClientId').value;
+                const produitId = document.getElementById('produitId').value;
+                const quantite = document.getElementById('quantite').value;
+                const date = document.getElementById('dateReservation').value;
+                
+                console.log('Critical check:');
+                console.log('  clientId:', clientId);
+                console.log('  produitId:', produitId);
+                console.log('  quantite:', quantite);
+                console.log('  date:', date);
+                
+                if (!clientId || !produitId || !quantite || !date) {
+                    console.error('❌ Missing required fields!');
+                    alert('Please fill all required fields first!');
+                    return;
+                }
+                
+                // Force submit the form
+                console.log('✅ Force submitting form...');
+                form.submit();
+                
+                console.log('=== FORCE SUBMIT END ===');
+                
+            } catch (error) {
+                console.error('❌ ERROR in forceSubmit:', error);
+                alert('Error in force submit: ' + error.message);
+            }
+        }
+        
+        // Debug function
+        function debugForm() {
+            try {
+                console.log('=== DEBUG FORM STATE START ===');
+                
+                // Check if elements exist
+                const clientIdElement = document.getElementById('selectedClientId');
+                const produitIdElement = document.getElementById('produitId');
+                const quantiteElement = document.getElementById('quantite');
+                const dateElement = document.getElementById('dateReservation');
+                const submitBtnElement = document.getElementById('submitBtn');
+                
+                console.log('Elements found:');
+                console.log('  selectedClientId element:', clientIdElement);
+                console.log('  produitId element:', produitIdElement);
+                console.log('  quantite element:', quantiteElement);
+                console.log('  dateReservation element:', dateElement);
+                console.log('  submitBtn element:', submitBtnElement);
+                
+                // Check each field individually
+                const hasClient = selectedClient !== null;
+                const hasClientId = clientIdElement ? clientIdElement.value !== '' : false;
+                const hasProduit = produitIdElement ? produitIdElement.value !== '' : false;
+                const hasQuantite = quantiteElement ? quantiteElement.value !== '' : false;
+                const hasDate = dateElement ? dateElement.value !== '' : false;
+                
+                console.log('Field status:');
+                console.log('  selectedClient (object):', selectedClient);
+                console.log('  hasClient (object not null):', hasClient);
+                console.log('  clientId (field value):', clientIdElement ? clientIdElement.value : 'ELEMENT NOT FOUND');
+                console.log('  hasClientId (field not empty):', hasClientId);
+                console.log('  produitId:', produitIdElement ? produitIdElement.value : 'ELEMENT NOT FOUND');
+                console.log('  hasProduit:', hasProduit);
+                console.log('  quantite:', quantiteElement ? quantiteElement.value : 'ELEMENT NOT FOUND');
+                console.log('  hasQuantite:', hasQuantite);
+                console.log('  date:', dateElement ? dateElement.value : 'ELEMENT NOT FOUND');
+                console.log('  hasDate:', hasDate);
+                
+                // Overall validation
+                const isValid = hasClient && hasClientId && hasProduit && hasQuantite && hasDate;
+                console.log('  Overall isValid:', isValid);
+                console.log('  submitBtn.disabled:', submitBtnElement ? submitBtnElement.disabled : 'ELEMENT NOT FOUND');
+                
+                // Force enable button for testing
+                if (submitBtnElement) {
+                    submitBtnElement.disabled = false;
+                    console.log('✅ Button force-enabled for testing');
+                } else {
+                    console.error('❌ Submit button element not found!');
+                }
+                
+                console.log('=== DEBUG FORM STATE END ===');
+                
+                // Show detailed alert
+                let message = 'Debug Results:\n\n';
+                message += `Client Object: ${hasClient ? '✅' : '❌'}\n`;
+                message += `Client ID Field: ${hasClientId ? '✅' : '❌'}\n`;
+                message += `Produit: ${hasProduit ? '✅' : '❌'}\n`;
+                message += `Quantité: ${hasQuantite ? '✅' : '❌'}\n`;
+                message += `Date: ${hasDate ? '✅' : '❌'}\n`;
+                message += `\nOverall Valid: ${isValid ? '✅' : '❌'}\n`;
+                message += '\nSubmit button force-enabled!';
+                
+                alert(message);
+                
+            } catch (error) {
+                console.error('❌ ERROR in debugForm function:', error);
+                alert('Error in debug function: ' + error.message);
+            }
+        }
+        
+        // Check form validity
+        function checkFormValidity() {
+            const hasClient = selectedClient !== null;
+            const hasProduit = document.getElementById('produitId').value !== '';
+            const hasQuantite = document.getElementById('quantite').value !== '';
+            const hasDate = document.getElementById('dateReservation').value !== '';
+            
+            const isValid = hasClient && hasProduit && hasQuantite && hasDate;
+            
+            console.log('=== FORM VALIDITY CHECK ===');
+            console.log('hasClient:', hasClient, 'selectedClient:', selectedClient);
+            console.log('hasProduit:', hasProduit, 'produitId:', document.getElementById('produitId').value);
+            console.log('hasQuantite:', hasQuantite, 'quantite:', document.getElementById('quantite').value);
+            console.log('hasDate:', hasDate, 'date:', document.getElementById('dateReservation').value);
+            console.log('isValid:', isValid);
+            
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = !isValid;
+            
+            console.log('Button disabled:', submitBtn.disabled);
+            console.log('=== END FORM VALIDITY ===');
+        }
+        
+        // Availability check
+        function checkAvailability() {
+            const produitId = document.getElementById('produitId').value;
+            const quantite = document.getElementById('quantite').value;
+            const date = document.getElementById('dateReservation').value;
+            const submitBtn = document.getElementById('submitBtn');
+            const alert = document.getElementById('availabilityAlert');
+            const message = document.getElementById('availabilityMessage');
+            const stockInfo = document.getElementById('stockInfo');
+            
+            if (!produitId || !quantite || !date) {
+                return;
+            }
+            
+            fetch(`/reservations/check-availability?produitId=${produitId}&date=${date}&quantity=${quantite}`)
+                .then(response => response.text())
+                .then(result => {
+                    if (result.startsWith('AVAILABLE')) {
+                        alert.classList.add('d-none');
+                        checkFormValidity();
+                        stockInfo.textContent = '✅ Disponible';
+                        stockInfo.className = 'form-text text-success';
+                    } else if (result.startsWith('INSUFFICIENT')) {
+                        const available = result.split(':')[1];
+                        message.textContent = `Stock insuffisant. Disponible: ${available}, Demandé: ${quantite}`;
+                        alert.classList.remove('d-none');
+                        submitBtn.disabled = true;
+                        stockInfo.textContent = `❌ Stock insuffisant (${available} disponibles)`;
+                        stockInfo.className = 'form-text text-danger';
+                    } else {
+                        message.textContent = 'Erreur lors de la vérification';
+                        alert.classList.remove('d-none');
+                        submitBtn.disabled = true;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking availability:', error);
+                    message.textContent = 'Erreur lors de la vérification';
+                    alert.classList.remove('d-none');
+                    submitBtn.disabled = true;
+                });
+        }
+        
+        // Event listeners for form fields
+        document.getElementById('produitId').addEventListener('change', function() {
+            console.log('Produit changed to:', this.value);
+            checkFormValidity();
+            checkAvailability();
+        });
+        
+        document.getElementById('quantite').addEventListener('input', function() {
+            console.log('Quantité changed to:', this.value);
+            checkFormValidity();
+            checkAvailability();
+        });
+        
+        document.getElementById('dateReservation').addEventListener('change', function() {
+            console.log('Date changed to:', this.value);
+            const date = new Date(this.value);
+            const limitDate = new Date(date);
+            limitDate.setDate(date.getDate() - 1);
+            document.getElementById('dateLimite').value = limitDate.toISOString().split('T')[0];
+            checkFormValidity();
+            checkAvailability();
+        });
+        
+        // Initialize form validity check on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('=== PAGE LOADED ===');
+            checkFormValidity();
+        });
+        
+        // Phone number search on Enter key
+        document.getElementById('telephoneSearch').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                searchClient();
+            }
+        });
+    </script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

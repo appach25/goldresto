@@ -16,6 +16,10 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.core.JsonProcessingException;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -74,6 +78,148 @@ public class ClientController {
     public String simpleTest() {
         System.out.println("=== TEST SIMPLE CONTROLLER ===");
         return "Controller fonctionne ! Nombre de clients: " + clientService.getAllClients().size();
+    }
+    
+    @GetMapping("/search-by-phone")
+    @ResponseBody
+    public Map<String, Object> searchByPhone(@RequestParam String telephone) {
+        Map<String, Object> response = new HashMap<>();
+        
+        logger.info("=== RECHERCHE CLIENT PAR TÉLÉPHONE ===");
+        logger.info("Téléphone recherché: '{}'", telephone);
+        
+        try {
+            // Nettoyer le numéro de téléphone
+            String cleanedPhone = telephone.replaceAll("[\\s\\-\\.]", "");
+            logger.info("Téléphone nettoyé: '{}'", cleanedPhone);
+            
+            List<Client> clients = clientService.getAllClients();
+            logger.info("Nombre total de clients dans la base: {}", clients.size());
+            
+            Client foundClient = null;
+            
+            for (int i = 0; i < clients.size(); i++) {
+                Client client = clients.get(i);
+                logger.info("Client {}: {} - Téléphone: '{}'", i+1, client.getNomComplet(), client.getTelephone());
+                
+                if (client.getTelephone() != null) {
+                    String clientPhone = client.getTelephone().replaceAll("[\\s\\-\\.]", "");
+                    logger.info("Téléphone client {} nettoyé: '{}'", i+1, clientPhone);
+                    
+                    if (clientPhone.equals(cleanedPhone)) {
+                        foundClient = client;
+                        logger.info("✅ Client trouvé: {}", client.getNomComplet());
+                        break;
+                    }
+                } else {
+                    logger.info("Client {} n'a pas de téléphone", i+1);
+                }
+            }
+            
+            if (foundClient != null) {
+                response.put("found", true);
+                response.put("client", Map.of(
+                    "id", foundClient.getId(),
+                    "nomComplet", foundClient.getNomComplet(),
+                    "telephone", foundClient.getTelephone(),
+                    "email", foundClient.getEmail() != null ? foundClient.getEmail() : "",
+                    "ville", foundClient.getVille() != null ? foundClient.getVille() : ""
+                ));
+                logger.info("✅ Réponse positive envoyée");
+            } else {
+                response.put("found", false);
+                logger.info("❌ Aucun client trouvé pour le téléphone: {}", telephone);
+            }
+            
+        } catch (Exception e) {
+            logger.error("❌ Erreur lors de la recherche du client", e);
+            response.put("found", false);
+            response.put("error", e.getMessage());
+        }
+        
+        logger.info("=== FIN RECHERCHE CLIENT ===");
+        return response;
+    }
+    
+    @PostMapping("/create-ajax")
+    @ResponseBody
+    public Map<String, Object> createClientAjax(@RequestBody Map<String, Object> clientData) {
+        Map<String, Object> response = new HashMap<>();
+        
+        logger.info("=== CRÉATION CLIENT AJAX ===");
+        logger.info("Données reçues: {}", clientData);
+        
+        try {
+            Client client = new Client();
+            client.setNom((String) clientData.get("nom"));
+            client.setPrenom((String) clientData.get("prenom"));
+            client.setTelephone((String) clientData.get("telephone"));
+            client.setEmail((String) clientData.get("email"));
+            client.setVille((String) clientData.get("ville"));
+            client.setActif((Boolean) clientData.getOrDefault("actif", true));
+            
+            logger.info("Client à créer: {} {} - {}", client.getNom(), client.getPrenom(), client.getTelephone());
+            
+            Client savedClient = clientService.createClient(client);
+            
+            logger.info("✅ Client créé avec ID: {}", savedClient.getId());
+            
+            response.put("success", true);
+            response.put("client", Map.of(
+                "id", savedClient.getId(),
+                "nomComplet", savedClient.getNomComplet(),
+                "telephone", savedClient.getTelephone(),
+                "email", savedClient.getEmail() != null ? savedClient.getEmail() : "",
+                "ville", savedClient.getVille() != null ? savedClient.getVille() : ""
+            ));
+            
+            logger.info("✅ Réponse positive envoyée");
+            
+        } catch (Exception e) {
+            logger.error("❌ Erreur lors de la création du client", e);
+            response.put("success", false);
+            response.put("message", e.getMessage());
+        }
+        
+        logger.info("=== FIN CRÉATION CLIENT AJAX ===");
+        return response;
+    }
+    
+    @GetMapping("/test-clients")
+    @ResponseBody
+    public Map<String, Object> testClients() {
+        Map<String, Object> response = new HashMap<>();
+        
+        logger.info("=== TEST CLIENTS EN BASE ===");
+        
+        try {
+            List<Client> clients = clientService.getAllClients();
+            response.put("totalClients", clients.size());
+            
+            List<Map<String, Object>> clientList = new ArrayList<>();
+            for (Client client : clients) {
+                Map<String, Object> clientInfo = new HashMap<>();
+                clientInfo.put("id", client.getId());
+                clientInfo.put("nom", client.getNom());
+                clientInfo.put("prenom", client.getPrenom());
+                clientInfo.put("nomComplet", client.getNomComplet());
+                clientInfo.put("telephone", client.getTelephone());
+                clientInfo.put("email", client.getEmail());
+                clientInfo.put("ville", client.getVille());
+                clientInfo.put("actif", client.getActif());
+                clientList.add(clientInfo);
+            }
+            
+            response.put("clients", clientList);
+            logger.info("✅ {} clients trouvés", clients.size());
+            
+        } catch (Exception e) {
+            logger.error("❌ Erreur lors du test des clients", e);
+            response.put("error", e.getMessage());
+        }
+        
+        logger.info("=== FIN TEST CLIENTS ===");
+        return response;
     }
     
     @GetMapping("/simple-list")

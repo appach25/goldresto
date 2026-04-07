@@ -1,5 +1,6 @@
 package com.goldresto.repository;
 
+import com.goldresto.entity.Client;
 import com.goldresto.entity.Produit;
 import com.goldresto.entity.Reservation;
 import com.goldresto.entity.User;
@@ -19,6 +20,8 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     List<Reservation> findByStatus(Reservation.ReservationStatus status);
     
     List<Reservation> findByUser(User user);
+    
+    List<Reservation> findByClient(Client client);
     
     List<Reservation> findByProduit(Produit produit);
     

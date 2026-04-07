@@ -36,7 +36,7 @@ public class Client {
     private String email;
     
     @Size(max = 20, message = "Le téléphone ne peut pas dépasser 20 caractères")
-    @Column(name = "telephone", length = 20)
+    @Column(name = "telephone", length = 20, unique = true)
     private String telephone;
     
     @Size(max = 255, message = "L'adresse ne peut pas dépasser 255 caractères")

@@ -112,12 +112,19 @@
                     <li class="nav-item dropdown" sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_OWNER', 'ROLE_EMPLOYEE')">
                         <a class="nav-link dropdown-toggle position-relative" href="#" id="notificationsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-bell"></i>
-                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="notificationCount" style="font-size: 0.6em;">0</span>
+                            <!-- Solution hybride: valeur initiale server-side, mise à jour client-side -->
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" 
+                                  id="notificationCount" 
+                                  th:text="${notificationCount > 99 ? '99+' : (notificationCount > 0 ? notificationCount : '')}" 
+                                  th:style="${notificationCount > 0 ? 'font-size: 0.6em; display: inline-block;' : 'font-size: 0.6em; display: none;'}">
+                            </span>
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end" style="min-width: 350px;" id="notificationsDropdownMenu">
                             <li class="dropdown-header">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <span>Notifications</span>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" id="testNotificationsBtn">Test</button>
+                                    <a href="/notifications/debug/count" class="btn btn-sm btn-outline-secondary" target="_blank">Debug</a>
                                     <a href="/notifications" class="text-decoration-none small">Voir tout</a>
                                 </div>
                             </li>
@@ -169,59 +176,137 @@
             
             // Rafraîchir les notifications toutes les 30 secondes
             setInterval(loadNotifications, 30000);
+            
+            // Ajouter l'event listener pour le bouton test
+            const testBtn = document.getElementById('testNotificationsBtn');
+            if (testBtn) {
+                testBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    testNotifications();
+                });
+                console.log('Test button event listener added');
+            } else {
+                console.log('Test button not found');
+            }
         });
         
         // Charger les notifications via AJAX
         function loadNotifications() {
             console.log('=== CHARGEMENT DES NOTIFICATIONS ===');
-            fetch('/notifications/api/count')
-                .then(response => {
-                    console.log('Réponse reçue:', response.status, response.statusText);
-                    if (!response.ok) {
-                        throw new Error('HTTP ' + response.status);
+            
+            // Attendre que le badge soit disponible
+            const waitForBadge = (callback, maxAttempts = 10) => {
+                let attempts = 0;
+                const checkBadge = () => {
+                    const badge = document.getElementById('notificationCount');
+                    if (badge) {
+                        console.log('Badge trouvé après', attempts, 'tentatives');
+                        callback();
+                    } else if (attempts < maxAttempts) {
+                        attempts++;
+                        console.log('Badge non trouvé, tentative', attempts, '/', maxAttempts);
+                        setTimeout(checkBadge, 100);
+                    } else {
+                        console.error('Badge non trouvé après', maxAttempts, 'tentatives');
                     }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('Données reçues:', data);
-                    console.log('Count:', data.count);
-                    console.log('Debug info:', data.debugInfo);
-                    console.log('Total notifications:', data.totalNotifications);
-                    
-                    updateNotificationBadge(data.count);
-                    updateNotificationsList(data.notifications);
-                    
-                    // Debug: vérifier le badge après mise à jour
-                    setTimeout(() => {
+                };
+                checkBadge();
+            };
+            
+            // Lancer la recherche du badge puis l'API
+            waitForBadge(() => {
+                fetch('/notifications/api/count')
+                    .then(response => {
+                        console.log('Réponse reçue:', response.status, response.statusText);
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log('=== DONNÉES NOTIFICATIONS REÇUES ===');
+                        console.log('Données brutes:', data);
+                        console.log('Count:', data.count);
+                        console.log('Type de count:', typeof data.count);
+                        
+                        // Debug: vérifier le badge avant mise à jour
+                        const badgeBefore = document.getElementById('notificationCount');
+                        console.log('Badge avant mise à jour - Élément:', badgeBefore);
+                        console.log('Badge avant mise à jour - Texte:', badgeBefore ? badgeBefore.textContent : 'NOT FOUND');
+                        
+                        updateNotificationBadge(data.count);
+                        updateNotificationsList(data.notifications);
+                        
+                        // Debug: vérifier le badge après mise à jour
+                        setTimeout(() => {
+                            const badgeAfter = document.getElementById('notificationCount');
+                            console.log('Badge après mise à jour - Élément:', badgeAfter);
+                            console.log('Badge après mise à jour - Texte:', badgeAfter ? badgeAfter.textContent : 'NOT FOUND');
+                            console.log('Badge après mise à jour - Display:', badgeAfter ? badgeAfter.style.display : 'NOT FOUND');
+                        }, 100);
+                        
+                        console.log('=== FIN CHARGEMENT NOTIFICATIONS ===');
+                    })
+                    .catch(error => {
+                        console.error('Erreur lors du chargement des notifications:', error);
                         const badge = document.getElementById('notificationCount');
-                        console.log('Badge après mise à jour - Texte:', badge.textContent, 'Display:', badge.style.display);
-                    }, 100);
-                })
-                .catch(error => {
-                    console.error('Erreur lors du chargement des notifications:', error);
-                    document.getElementById('notificationCount').textContent = '0';
-                    document.getElementById('notificationsList').innerHTML = `
-                        <div class="text-center py-3">
-                            <small class="text-muted">Erreur de chargement: ${error.message}</small>
-                        </div>
-                    `;
-                });
+                        if (badge) {
+                            badge.textContent = '0';
+                        }
+                        const listElement = document.getElementById('notificationsList');
+                        if (listElement) {
+                            listElement.innerHTML = `
+                                <div class="text-center py-3">
+                                    <small class="text-muted">Erreur de chargement: ${error.message}</small>
+                                </div>
+                            `;
+                        }
+                    });
+            });
         }
         
         // Mettre à jour le badge du compteur
         function updateNotificationBadge(count) {
-            console.log('Mise à jour du badge avec count:', count);
+            console.log('=== UPDATE NOTIFICATION BADGE ===');
+            console.log('Count reçu:', count);
+            console.log('Type de count:', typeof count);
+            
             const badge = document.getElementById('notificationCount');
             console.log('Badge trouvé:', badge);
             
-            if (count > 0) {
-                badge.textContent = count > 99 ? '99+' : count;
-                badge.style.display = 'inline-block';
-                console.log('Badge affiché avec:', badge.textContent);
-            } else {
-                badge.style.display = 'none';
-                console.log('Badge caché');
+            if (!badge) {
+                console.error('❌ Badge non trouvé!');
+                return;
             }
+            
+            console.log('Badge avant mise à jour:');
+            console.log('  - Texte:', badge.textContent);
+            console.log('  - Display:', badge.style.display);
+            console.log('  - Visibility:', badge.style.visibility);
+            
+            // Forcer la mise à jour du badge
+            if (count > 0) {
+                const displayText = count > 99 ? '99+' : count.toString();
+                badge.textContent = displayText;
+                badge.style.display = 'inline-block';
+                badge.style.visibility = 'visible';
+                console.log('✅ Badge mis à jour avec:', displayText);
+            } else {
+                badge.textContent = '0';
+                badge.style.display = 'none';
+                console.log('✅ Badge caché (count = 0)');
+            }
+            
+            console.log('Badge après mise à jour:');
+            console.log('  - Texte:', badge.textContent);
+            console.log('  - Display:', badge.style.display);
+            console.log('  - Visibility:', badge.style.visibility);
+            
+            // Forcer la ré-affichage du badge
+            badge.offsetHeight; // Force reflow
+            
+            console.log('=== END UPDATE NOTIFICATION BADGE ===');
         }
         
         // Mettre à jour la liste des notifications
@@ -316,6 +401,104 @@
         // Voir une notification
         function viewNotification(notificationId) {
             window.location.href = `/notifications/${notificationId}/redirect`;
+        }
+        
+        // Test des notifications - affiche les résultats dans l'interface
+        function testNotifications() {
+            console.log('=== TEST NOTIFICATIONS MANUEL ===');
+            
+            const listElement = document.getElementById('notificationsList');
+            
+            // Afficher un message de chargement simple
+            listElement.innerHTML = `
+                <div class="p-3 text-center">
+                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                    <div class="small text-muted mt-2">Test en cours...</div>
+                </div>
+            `;
+            
+            // Tester l'API avec gestion d'erreur simple
+            fetch('/notifications/api/count')
+                .then(response => {
+                    console.log('Test - Réponse HTTP:', response.status);
+                    if (!response.ok) {
+                        throw new Error('HTTP ' + response.status);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Test - Données reçues:', data);
+                    
+                    // Afficher les résultats de manière simple
+                    let resultHtml = `
+                        <div class="p-3">
+                            <h6 class="text-primary">🔍 Résultats du test</h6>
+                            <div class="mb-2">
+                                <strong>Count API:</strong> <span class="badge bg-info">${data.count}</span>
+                            </div>
+                            <div class="mb-2">
+                                <strong>Badge avant:</strong> <span class="badge bg-secondary">${document.getElementById('notificationCount').textContent}</span>
+                            </div>
+                            <div class="mb-2">
+                                <strong>Badge après:</strong> <span id="badgeAfter" class="badge bg-warning">En cours...</span>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Notifications:</strong> ${data.notifications ? data.notifications.length : 0}
+                            </div>
+                            <button type="button" class="btn btn-sm btn-success" onclick="testBadgeManually(${data.count})">
+                                🧪 Tester Badge Manuellement
+                            </button>
+                        </div>
+                    `;
+                    
+                    listElement.innerHTML = resultHtml;
+                    
+                    // Mettre à jour le badge
+                    console.log('Test - Mise à jour du badge avec count:', data.count);
+                    updateNotificationBadge(data.count);
+                    
+                    // Mettre à jour l'affichage après test
+                    setTimeout(() => {
+                        const badge = document.getElementById('notificationCount');
+                        const badgeAfter = document.getElementById('badgeAfter');
+                        if (badgeAfter && badge) {
+                            badgeAfter.textContent = badge.textContent;
+                            badgeAfter.className = badge.textContent === '0' ? 'badge bg-danger' : 'badge bg-success';
+                        }
+                        console.log('Test - Badge final:', badge ? badge.textContent : 'NOT FOUND');
+                    }, 100);
+                    
+                })
+                .catch(error => {
+                    console.error('Test - Erreur:', error);
+                    listElement.innerHTML = `
+                        <div class="p-3">
+                            <h6 class="text-danger">❌ Erreur</h6>
+                            <div class="text-danger small">${error.message}</div>
+                            <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="testNotifications()">
+                                🔄 Réessayer
+                            </button>
+                        </div>
+                    `;
+                });
+        }
+        
+        // Test manuel du badge
+        function testBadgeManually(count) {
+            console.log('=== TEST MANUEL DU BADGE ===');
+            console.log('Count utilisé:', count);
+            
+            const badge = document.getElementById('notificationCount');
+            console.log('Badge avant test manuel:', badge ? badge.textContent : 'NOT FOUND');
+            
+            // Forcer la mise à jour
+            updateNotificationBadge(count);
+            
+            setTimeout(() => {
+                const badgeAfter = document.getElementById('notificationCount');
+                console.log('Badge après test manuel:', badgeAfter ? badgeAfter.textContent : 'NOT FOUND');
+                alert('Badge actuel: ' + (badgeAfter ? badgeAfter.textContent : 'NOT FOUND'));
+            }, 100);
         }
     </script>
 </body>

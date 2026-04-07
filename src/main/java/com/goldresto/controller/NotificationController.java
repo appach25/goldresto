@@ -82,12 +82,18 @@ public class NotificationController {
     @ResponseBody
     public Map<String, Object> getNotificationsCount() {
         try {
+            logger.info("=== API NOTIFICATIONS COUNT START ===");
+            
             // Récupérer l'utilisateur authentifié
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             String username = auth.getName();
             
+            logger.info("Utilisateur authentifié: {}", username);
+            
             User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("Utilisateur non trouvé: " + username));
+            
+            logger.info("Utilisateur trouvé - ID: {}, Username: {}", user.getId(), user.getUsername());
             
             long count = notificationService.countNotificationsNonLues(user);
             List<Notification> recentNotifications = notificationService.getNotificationsNonLues(user)
@@ -95,9 +101,25 @@ public class NotificationController {
                 .limit(5)
                 .toList();
             
+            logger.info("Nombre de notifications non lues: {}", count);
+            logger.info("Notifications récentes récupérées: {}", recentNotifications.size());
+            
+            // Log des notifications pour debug
+            if (!recentNotifications.isEmpty()) {
+                recentNotifications.forEach(n -> 
+                    logger.info("  - Notification ID: {}, Titre: {}, Status: {}", 
+                               n.getId(), n.getTitre(), n.getStatus())
+                );
+            }
+            
             Map<String, Object> response = new HashMap<>();
             response.put("count", count);
             response.put("notifications", recentNotifications);
+            response.put("debugInfo", "User: " + username + ", Count: " + count);
+            response.put("totalNotifications", recentNotifications.size());
+            
+            logger.info("=== API NOTIFICATIONS COUNT END ===");
+            logger.info("Réponse retournée: count={}, notifications={}", count, recentNotifications.size());
             
             return response;
         } catch (Exception e) {
@@ -105,6 +127,7 @@ public class NotificationController {
             Map<String, Object> response = new HashMap<>();
             response.put("count", 0);
             response.put("notifications", List.of());
+            response.put("error", e.getMessage());
             return response;
         }
     }
