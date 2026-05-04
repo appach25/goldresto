@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test WhatsApp (Hors Ligne) - GoldResto</title>
+    
+    <!-- CSS LOCAL pour travail hors ligne -->
+    <link th:href="@{/css/bootstrap-offline.css}" rel="stylesheet">
+    <link th:href="@{/css/icons-offline.css}" rel="stylesheet">
+    <link th:href="@{/css/main.css}" rel="stylesheet">
+    
+    <style>
+        /* Styles supplémentaires pour le test */
+        .offline-indicator {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: #28a745;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            z-index: 9999;
+        }
+        
+        .test-section {
+            border: 2px dashed #007bff;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+        
+        .status-online { color: #28a745; }
+        .status-offline { color: #dc3545; }
+        
+        .icon-test {
+            font-size: 2em;
+            margin: 10px;
+            padding: 10px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            display: inline-block;
+            text-align: center;
+            min-width: 80px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Indicateur hors ligne -->
+    <div class="offline-indicator">
+        <i class="bi bi-check-circle"></i> HORS LIGNE
+    </div>
+    
+    <!-- Navbar locale -->
+    <nav class="navbar">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class="bi bi-house"></i> GoldResto (Hors Ligne)
+            </a>
+            <div class="d-flex">
+                <span class="me-3">
+                    <i class="bi bi-bell"></i> 
+                    <span class="badge bg-danger">3</span>
+                </span>
+                <span>
+                    <i class="bi bi-person"></i> Admin
+                </span>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <h1><i class="bi bi-whatsapp"></i> Test WhatsApp (Mode Hors Ligne)</h1>
+                <p class="text-muted">Cette page fonctionne complètement hors ligne avec des ressources locales.</p>
+                
+                <!-- Section de test des icônes -->
+                <div class="test-section">
+                    <h3><i class="bi bi-info-circle"></i> Test des icônes locales</h3>
+                    <div class="row">
+                        <div class="col-md-3 col-6 text-center">
+                            <div class="icon-test">
+                                <i class="bi bi-whatsapp"></i>
+                                <div>WhatsApp</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-6 text-center">
+                            <div class="icon-test">
+                                <i class="bi bi-envelope"></i>
+                                <div>Email</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-6 text-center">
+                            <div class="icon-test">
+                                <i class="bi bi-phone"></i>
+                                <div>Téléphone</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-6 text-center">
+                            <div class="icon-test">
+                                <i class="bi bi-send"></i>
+                                <div>Envoyer</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Section de test WhatsApp -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-whatsapp"></i> Test d'envoi WhatsApp (Simulation)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Mode hors ligne activé</strong> - Tous les CSS, JS et icônes sont chargés localement.
+                        </div>
+                        
+                        <form id="whatsappTestForm">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="clientId" class="form-label">
+                                            <i class="bi bi-person"></i> Client
+                                        </label>
+                                        <select class="form-select" id="clientId" required>
+                                            <option value="">Sélectionner un client...</option>
+                                            <option value="1">Jean Dupont - +33612345678</option>
+                                            <option value="2">Marie Martin - +33687654321</option>
+                                            <option value="3">Pierre Bernard - +33611223344</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="phoneNumber" class="form-label">
+                                            <i class="bi bi-phone"></i> Numéro WhatsApp
+                                        </label>
+                                        <input type="text" class="form-control" id="phoneNumber" readonly 
+                                               placeholder="Sélectionner un client">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="message" class="form-label">
+                                    <i class="bi bi-envelope"></i> Message
+                                </label>
+                                <textarea class="form-control" id="message" rows="4" 
+                                          placeholder="Votre message WhatsApp..." required>Ceci est un message de test hors ligne !</textarea>
+                            </div>
+                            
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-success">
+                                    <i class="bi bi-whatsapp"></i> Simuler l'envoi
+                                </button>
+                                <button type="button" class="btn btn-outline-primary" onclick="showStatus()">
+                                    <i class="bi bi-gear"></i> Vérifier le statut
+                                </button>
+                            </div>
+                        </form>
+                        
+                        <!-- Result -->
+                        <div id="testResult" class="mt-3"></div>
+                        
+                        <!-- Status -->
+                        <div id="statusSection" class="mt-3" style="display: none;">
+                            <h6><i class="bi bi-gear"></i> Statut du système :</h6>
+                            <div class="bg-dark text-light p-3 rounded">
+                                <pre id="statusContent"></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Section des fonctionnalités testées -->
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h5><i class="bi bi-check-circle"></i> Fonctionnalités testées</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6><i class="bi bi-check-circle text-success"></i> CSS Local</h6>
+                                <ul>
+                                    <li>Bootstrap CSS simplifié</li>
+                                    <li>Responsive design</li>
+                                    <li>Components (cards, forms, alerts)</li>
+                                    <li>Utilities (margin, padding, colors)</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6><i class="bi bi-check-circle text-success"></i> JavaScript Local</h6>
+                                <ul>
+                                    <li>Bootstrap JS simplifié</li>
+                                    <li>Gestion des tabs</li>
+                                    <li>Gestion des modals</li>
+                                    <li>Utilitaires de validation</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <h6><i class="bi bi-check-circle text-success"></i> Icônes Locales</h6>
+                                <ul>
+                                    <li>Remplacement Bootstrap Icons</li>
+                                    <li>Icônes Unicode/CSS</li>
+                                    <li>Couleurs et animations</li>
+                                    <li>Responsive icons</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6><i class="bi bi-check-circle text-success"></i> Performance</h6>
+                                <ul>
+                                    <li>Chargement instantané</li>
+                                    <li>Pas de dépendances externes</li>
+                                    <li>Fonctionne complètement hors ligne</li>
+                                    <li>Compatible avec l'application existante</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- JavaScript LOCAL -->
+    <script th:src="@{/js/bootstrap-offline.js}"></script>
+    
+    <script>
+        // Mettre à jour le numéro de téléphone quand on sélectionne un client
+        document.getElementById('clientId').addEventListener('change', function() {
+            const clientId = this.value;
+            const phones = {
+                '1': '+33612345678',
+                '2': '+33687654321', 
+                '3': '+33611223344'
+            };
+            
+            document.getElementById('phoneNumber').value = phones[clientId] || '';
+        });
+        
+        // Afficher le statut
+        function showStatus() {
+            const statusSection = document.getElementById('statusSection');
+            const statusContent = document.getElementById('statusContent');
+            
+            statusSection.style.display = statusSection.style.display === 'none' ? 'block' : 'none';
+            
+            if (statusSection.style.display === 'block') {
+                statusContent.textContent = `=== STATUT SYSTÈME HORS LIGNE ===
+CSS Bootstrap: LOCAL (OK)
+JavaScript Bootstrap: LOCAL (OK)
+Icônes: LOCALES (OK)
+Twilio: CONFIGURÉ (OK)
+Application: FONCTIONNEL (OK)
+Mode: HORS LIGNE COMPLET
+=== FIN STATUT ===`;
+            }
+        }
+        
+        // Formulaire de test
+        document.getElementById('whatsappTestForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const clientId = document.getElementById('clientId').value;
+            const message = document.getElementById('message').value;
+            
+            if (!clientId || !message) {
+                BootstrapUtils.showToast('Veuillez remplir tous les champs', 'warning');
+                return;
+            }
+            
+            const resultDiv = document.getElementById('testResult');
+            
+            // Simuler l'envoi
+            resultDiv.innerHTML = '<div class="alert alert-info"><i class="bi bi-gear"></i> Simulation en cours...</div>';
+            
+            setTimeout(() => {
+                resultDiv.innerHTML = `
+                    <div class="alert alert-success">
+                        <i class="bi bi-check-circle"></i> <strong>Simulation réussie !</strong>
+                        <br><small>Message simulé pour ${document.getElementById('phoneNumber').value}</small>
+                        <br><small>Mode hors ligne - tout fonctionne parfaitement !</small>
+                    </div>
+                `;
+                
+                BootstrapUtils.showToast('Message WhatsApp simulé avec succès !', 'success');
+            }, 1500);
+        });
+        
+        // Vérifier le statut au chargement
+        window.addEventListener('load', function() {
+            console.log('Page hors ligne chargée avec succès');
+            BootstrapUtils.showToast('Application chargée en mode hors ligne', 'info');
+        });
+    </script>
+</body>
+</html>

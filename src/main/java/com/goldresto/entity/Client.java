@@ -256,6 +256,51 @@ public class Client {
         return LocalDate.now().getYear() - dateAnniversaire.getYear();
     }
     
+    /**
+     * Vérifier si le client a un numéro WhatsApp
+     */
+    public boolean hasWhatsAppNumber() {
+        return telephone != null && !telephone.trim().isEmpty();
+    }
+    
+    /**
+     * Obtenir le numéro formaté pour WhatsApp
+     */
+    public String getWhatsAppNumber() {
+        if (!hasWhatsAppNumber()) {
+            return null;
+        }
+        
+        // Formater le numéro pour WhatsApp
+        String formatted = telephone.replaceAll("[\\s\\-\\(\\)]", "");
+        
+        // Ajouter l'indicatif si nécessaire
+        if (!formatted.startsWith("+")) {
+            // Par défaut, ajouter l'indicatif français
+            if (formatted.startsWith("0")) {
+                formatted = "+33" + formatted.substring(1);
+            } else {
+                formatted = "+33" + formatted;
+            }
+        }
+        
+        return formatted;
+    }
+    
+    /**
+     * Obtenir les initiales
+     */
+    public String getInitiales() {
+        String initials = "";
+        if (nom != null && !nom.trim().isEmpty()) {
+            initials += nom.charAt(0);
+        }
+        if (prenom != null && !prenom.trim().isEmpty()) {
+            initials += prenom.charAt(0);
+        }
+        return initials.toUpperCase();
+    }
+    
     @Override
     public String toString() {
         return "Client{id=" + id + ", nom='" + nom + "', prenom='" + prenom + "', email='" + email + "'}";

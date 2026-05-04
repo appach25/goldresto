@@ -1,0 +1,168 @@
+/* Icônes locales pour remplacer Bootstrap Icons hors ligne */
+/* Utilisation de Unicode et CSS pour créer des icônes simples */
+
+/* Icônes principales */
+.bi::before {
+    display: inline-block;
+    font-style: normal;
+    font-variant: normal;
+    text-rendering: auto;
+    line-height: 1;
+}
+
+/* Icônes de navigation */
+.bi-house::before { content: "Home"; }
+.bi-bell::before { content: "Bell"; }
+.bi-people::before { content: "Users"; }
+.bi-person::before { content: "User"; }
+.bi-gear::before { content: "Settings"; }
+.bi-box-arrow-right::before { content: "Logout"; }
+
+/* Icônes de communication */
+.bi-envelope::before { content: "Mail"; }
+.bi-phone::before { content: "Phone"; }
+.bi-whatsapp::before { content: "WA"; color: #25D366; font-weight: bold; }
+
+/* Icônes d'action */
+.bi-send::before { content: "Send"; }
+.bi-plus::before { content: "+"; font-weight: bold; }
+.bi-pencil::before { content: "Edit"; }
+.bi-trash::before { content: "X"; color: #dc3545; }
+.bi-search::before { content: "Search"; }
+
+/* Icônes d'état */
+.bi-check-circle::before { content: "OK"; color: #28a745; }
+.bi-exclamation-triangle::before { content: "!"; color: #ffc107; }
+.bi-info-circle::before { content: "i"; color: #17a2b8; }
+
+/* Icônes de menu */
+.bi-list::before { content: "Menu"; }
+.bi-x-lg::before { content: "X"; font-size: 1.2em; }
+
+/* Icônes de fichiers */
+.bi-file-text::before { content: "Doc"; }
+.bi-download::before { content: "DL"; }
+
+/* Icônes de temps */
+.bi-clock-history::before { content: "History"; }
+.bi-calendar::before { content: "Date"; }
+
+/* Icônes de commerce */
+ bi-tag::before { content: "Tag"; }
+ bi-currency-euro::before { content: "EUR"; }
+
+/* Styles pour les icônes */
+.bi {
+    font-size: 1rem;
+    width: 1em;
+    height: 1em;
+    margin-right: 0.25rem;
+    text-align: center;
+}
+
+/* Icônes plus grandes */
+.bi-lg {
+    font-size: 1.5rem;
+}
+
+/* Couleurs spécifiques */
+.text-primary .bi::before { color: #007bff; }
+.text-success .bi::before { color: #28a745; }
+.text-danger .bi::before { color: #dc3545; }
+.text-warning .bi::before { color: #ffc107; }
+.text-info .bi::before { color: #17a2b8; }
+
+/* Badge pour les notifications */
+.notification-badge {
+    position: relative;
+}
+
+.notification-badge .badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    min-width: 18px;
+    height: 18px;
+    padding: 2px 5px;
+    font-size: 0.75em;
+    line-height: 1;
+    text-align: center;
+    border-radius: 10px;
+    background-color: #dc3545;
+    color: white;
+}
+
+/* Animation pour les icônes */
+@keyframes bi-pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.bi-pulse {
+    animation: bi-pulse 2s infinite;
+}
+
+/* Icônes WhatsApp spéciales */
+.bi-whatsapp {
+    position: relative;
+    padding-left: 20px;
+}
+
+.bi-whatsapp::before {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #25D366;
+    color: white;
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+/* Icônes de navigation pour le menu */
+.navbar-nav .bi {
+    margin-right: 8px;
+}
+
+/* Icônes dans les boutons */
+.btn .bi {
+    margin-right: 5px;
+}
+
+/* Icônes dans les cartes */
+.card-header .bi {
+    margin-right: 8px;
+}
+
+/* Icônes dans les tables */
+.table .bi {
+    margin-right: 5px;
+}
+
+/* Icônes dans les alerts */
+.alert .bi {
+    margin-right: 8px;
+    font-size: 1.2em;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .bi {
+        font-size: 0.9rem;
+    }
+    
+    .notification-badge .badge {
+        top: -6px;
+        right: -6px;
+        min-width: 16px;
+        height: 16px;
+        font-size: 0.7em;
+    }
+}

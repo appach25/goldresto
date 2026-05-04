@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Envoyer des notifications - GoldResto</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+</head>
+<body>
+    <div th:replace="~{fragments/navbar :: navbar}"></div>
+    
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <h2><i class="bi bi-bell"></i> Envoyer des notifications</h2>
+                
+                <!-- Messages flash -->
+                <div th:if="${success}" class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="bi bi-check-circle"></i> <span th:text="${success}"></span>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                
+                <div th:if="${error}" class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="bi bi-exclamation-triangle"></i> <span th:text="${error}"></span>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                
+                <!-- Tabs pour différents types d'envoi -->
+                <ul class="nav nav-tabs mt-4" id="notificationTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="client-tab" data-bs-toggle="tab" data-bs-target="#client" type="button" role="tab">
+                            <i class="bi bi-person"></i> Client spécifique
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="all-tab" data-bs-toggle="tab" data-bs-target="#all" type="button" role="tab">
+                            <i class="bi bi-people"></i> Tous les clients
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="promotion-tab" data-bs-toggle="tab" data-bs-target="#promotion" type="button" role="tab">
+                            <i class="bi bi-tag"></i> Promotion
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="whatsapp-tab" data-bs-toggle="tab" data-bs-target="#whatsapp" type="button" role="tab">
+                            <i class="bi bi-whatsapp"></i> WhatsApp rapide
+                        </button>
+                    </li>
+                </ul>
+                
+                <div class="tab-content mt-3" id="notificationTabsContent">
+                    <!-- Client spécifique -->
+                    <div class="tab-pane fade show active" id="client" role="tabpanel">
+                        <form th:action="@{/admin/notifications/send}" method="post">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="clientId" class="form-label">Client</label>
+                                        <select class="form-select" id="clientId" name="clientId" required>
+                                            <option value="">Sélectionner un client...</option>
+                                            <option th:each="client : ${clients}" 
+                                                    th:value="${client.id}" 
+                                                    th:text="${client.nom + ' ' + client.prenom}">
+                                            </option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="titre" class="form-label">Titre</label>
+                                        <input type="text" class="form-control" id="titre" name="titre" required>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="message" class="form-label">Message</label>
+                                <textarea class="form-control" id="message" name="message" rows="5" required></textarea>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="sendEmail" name="sendEmail">
+                                        <label class="form-check-label" for="sendEmail">
+                                            <i class="bi bi-envelope"></i> Envoyer par email
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="sendSms" name="sendSms">
+                                        <label class="form-check-label" for="sendSms">
+                                            <i class="bi bi-phone"></i> Envoyer par SMS
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="sendWhatsApp" name="sendWhatsApp">
+                                        <label class="form-check-label" for="sendWhatsApp">
+                                            <i class="bi bi-whatsapp"></i> Envoyer par WhatsApp
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary mt-3">
+                                <i class="bi bi-send"></i> Envoyer la notification
+                            </button>
+                        </form>
+                    </div>
+                    
+                    <!-- Tous les clients -->
+                    <div class="tab-pane fade" id="all" role="tabpanel">
+                        <form th:action="@{/admin/notifications/send-all}" method="post">
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i> 
+                                Cette notification sera envoyée à tous les clients (<span th:text="${clients.size()}"></span> clients)
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="titreAll" class="form-label">Titre</label>
+                                <input type="text" class="form-control" id="titreAll" name="titre" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="messageAll" class="form-label">Message</label>
+                                <textarea class="form-control" id="messageAll" name="message" rows="5" required></textarea>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="sendEmailAll" name="sendEmail">
+                                        <label class="form-check-label" for="sendEmailAll">
+                                            <i class="bi bi-envelope"></i> Envoyer par email
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="sendSmsAll" name="sendSms">
+                                        <label class="form-check-label" for="sendSmsAll">
+                                            <i class="bi bi-phone"></i> Envoyer par SMS
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="sendWhatsAppAll" name="sendWhatsApp">
+                                        <label class="form-check-label" for="sendWhatsAppAll">
+                                            <i class="bi bi-whatsapp"></i> Envoyer par WhatsApp
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-warning mt-3">
+                                <i class="bi bi-send"></i> Envoyer à tous les clients
+                            </button>
+                        </form>
+                    </div>
+                    
+                    <!-- Promotion -->
+                    <div class="tab-pane fade" id="promotion" role="tabpanel">
+                        <form th:action="@{/admin/notifications/send-promotion}" method="post">
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i> 
+                                Envoie une notification promotionnelle à tous les clients
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="promotion" class="form-label">Offre promotionnelle</label>
+                                <textarea class="form-control" id="promotion" name="promotion" rows="3" 
+                                          placeholder="Ex: -20% sur tous les plats ce week-end !" required></textarea>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-success mt-3">
+                                <i class="bi bi-tag"></i> Envoyer la promotion
+                            </button>
+                        </form>
+                    </div>
+                    
+                    <!-- WhatsApp rapide -->
+                    <div class="tab-pane fade" id="whatsapp" role="tabpanel">
+                        <form id="whatsappQuickForm">
+                            <div class="alert alert-success">
+                                <i class="bi bi-whatsapp"></i> 
+                                Envoyer un message WhatsApp rapide à un client
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="whatsappClientId" class="form-label">Client</label>
+                                        <select class="form-select" id="whatsappClientId" required>
+                                            <option value="">Sélectionner un client...</option>
+                                            <option th:each="client : ${clients}" 
+                                                    th:value="${client.id}" 
+                                                    th:text="${client.nom + ' ' + client.prenom + ' - ' + client.telephone}">
+                                            </option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="whatsappMessage" class="form-label">Message WhatsApp</label>
+                                        <textarea class="form-control" id="whatsappMessage" rows="3" 
+                                                  placeholder="Votre message WhatsApp..." required></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-success">
+                                <i class="bi bi-whatsapp"></i> Envoyer WhatsApp
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                
+                <!-- Historique des notifications -->
+                <div class="mt-5">
+                    <h4><i class="bi bi-clock-history"></i> Dernières notifications envoyées</h4>
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Destinataire</th>
+                                    <th>Titre</th>
+                                    <th>Canaux</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted">
+                                        <i class="bi bi-inbox"></i> Aucune notification envoyée récemment
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Formulaire WhatsApp rapide
+        document.getElementById('whatsappQuickForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const clientId = document.getElementById('whatsappClientId').value;
+            const message = document.getElementById('whatsappMessage').value;
+            
+            if (!clientId || !message) {
+                alert('Veuillez sélectionner un client et entrer un message');
+                return;
+            }
+            
+            // Envoyer via API
+            fetch('/admin/notifications/api/send-whatsapp', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    clientId: clientId,
+                    message: message
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Message WhatsApp envoyé avec succès !');
+                    document.getElementById('whatsappMessage').value = '';
+                } else {
+                    alert('Erreur: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+                alert('Erreur lors de l\'envoi du message WhatsApp');
+            });
+        });
+    </script>
+</body>
+</html>
